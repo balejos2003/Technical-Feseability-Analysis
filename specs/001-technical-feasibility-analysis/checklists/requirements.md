@@ -31,6 +31,7 @@
 
 ## Notes
 
-- All checklist items pass. The specification is ready for `/speckit-plan`.
+- All checklist items pass after adding the authorized historical consultation flow.
 - Validation found no unresolved clarification markers, implementation prescriptions,
-  or unbounded requirements.
+  or unbounded requirements. History requirements define retention, discoverability,
+  content integrity, and access boundaries.

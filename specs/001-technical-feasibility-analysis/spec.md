@@ -55,6 +55,32 @@ As a Developer, I want to trace each material conclusion to the inspected eviden
 2. **Given** the assessment contains an estimate or suggestion, **When** the Developer reviews it, **Then** the result labels it as an estimate or suggestion and includes its basis and uncertainty when available.
 3. **Given** the Developer decides to proceed or stop, **When** they act on the assessment, **Then** no codebase change is applied automatically by the analysis experience.
 
+---
+
+### User Story 4 - Consult Analysis History (Priority: P2)
+
+As a Developer, I want to access previous feasibility analyses so that I can review
+earlier decisions, compare conclusions, and reuse relevant context in future work.
+
+**Why this priority**: Historical consultation increases knowledge retention and reduces
+repeated analysis, while remaining secondary to producing a reliable current result.
+
+**Independent Test**: Complete at least two analyses, open the history, and verify
+that the Developer can find and reopen each assessment with its original context,
+conclusion, and evidence.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Developer has completed previous analyses, **When** they open the
+	analysis history, **Then** the system lists those analyses with enough summary
+	information to distinguish them.
+2. **Given** multiple historical analyses exist, **When** the Developer searches or
+	filters the history by relevant request context, **Then** matching analyses are
+	returned and unrelated analyses are excluded.
+3. **Given** the Developer opens a historical assessment, **When** the assessment is
+	displayed, **Then** its original request, evaluated scope, conclusion, findings,
+	assumptions, limitations, estimates, and suggestions remain available.
+
 ### Edge Cases
 
 - If the codebase reference is unavailable or cannot be inspected, the result must report that limitation and must not fabricate findings about the code.
@@ -62,6 +88,8 @@ As a Developer, I want to trace each material conclusion to the inspected eviden
 - If relevant evidence conflicts across files or sources, the result must identify the conflict rather than silently selecting one version.
 - If the requested change is outside the available codebase scope, the result must mark the conclusion as limited and identify the excluded scope.
 - If the change is technically feasible but depends on unresolved constraints, the result must distinguish conditional feasibility from unconditional feasibility.
+- If no historical analysis matches a search, the system must report that no matching
+	result was found without implying that no analysis has ever been performed.
 
 ## Requirements *(mandatory)*
 
@@ -81,12 +109,18 @@ As a Developer, I want to trace each material conclusion to the inspected eviden
 - **FR-012**: The system MUST allow the Developer to review the complete assessment before treating the result as a basis for a decision.
 - **FR-013**: The system MUST report when the available evidence is insufficient for a reliable conclusion instead of inventing missing details.
 - **FR-014**: The system MUST retain enough context in the result for the Developer to reproduce the assessment scope and challenge its material conclusions.
+- **FR-015**: The system MUST retain completed feasibility assessments for later consultation by the Developer.
+- **FR-016**: The system MUST list historical assessments with enough identifying information to distinguish their requested change, evaluation date, and conclusion category.
+- **FR-017**: The system MUST allow the Developer to search or filter historical assessments using relevant request context.
+- **FR-018**: The system MUST reopen a historical assessment with its original request, evidence, scope, conclusion, assumptions, limitations, estimates, and suggestions intact.
+- **FR-019**: The system MUST restrict historical consultation to assessments the Developer is authorized to access.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Analysis Request**: The Developer-provided codebase scope, desired change, description format, and relevant contextual constraints.
 - **Evidence Item**: A codebase observation, user-provided fact, assumption, limitation, or conflict used to support or qualify a finding.
 - **Feasibility Assessment**: The structured result containing the conclusion category, findings, risks, estimates, suggestions, assumptions, limitations, and unresolved questions.
+- **Analysis History**: The chronologically retained set of completed feasibility assessments available for authorized future consultation.
 - **Developer Decision**: The Developer's reviewed decision to accept, reject, revise, or defer the assessment or proposed change; it is not made automatically by the analysis.
 
 ## Success Criteria *(mandatory)*
@@ -99,6 +133,9 @@ As a Developer, I want to trace each material conclusion to the inspected eviden
 - **SC-004**: 100% of sampled analysis sessions leave the application codebase unchanged unless the Developer separately performs an explicitly reviewed action outside the analysis.
 - **SC-005**: At least 85% of Developers reviewing a completed assessment can identify the evaluated scope, main uncertainty, and recommended next decision without additional explanation.
 - **SC-006**: For requests missing material evidence, 100% of sampled assessments explicitly identify the missing evidence and avoid an unconditional feasibility claim.
+- **SC-007**: At least 95% of sampled completed assessments can be found in the history using their request context and reopened with their original material content unchanged.
+- **SC-008**: Developers can locate a specific historical assessment in under 2 minutes in at least 90% of representative search tasks.
+- **SC-009**: 100% of sampled history results exclude assessments the requesting Developer is not authorized to access.
 
 ## Assumptions
 
@@ -107,3 +144,5 @@ As a Developer, I want to trace each material conclusion to the inspected eviden
 - A codebase may contain incomplete, stale, or conflicting information, and the assessment must represent those conditions rather than silently repairing them.
 - The Developer remains the final decision-maker and is responsible for validating high-impact findings before implementation.
 - The feature produces analysis and suggestions only; implementation, deployment, and automatic code modification are outside scope.
+- Historical access is limited to analyses retained by the product and visible to the requesting Developer under the project's access rules.
+- The initial history experience needs search or filtering by request context, but does not require comparison or automatic merging of assessments.
