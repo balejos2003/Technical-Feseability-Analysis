@@ -29,7 +29,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 
 **Checkpoint**: Foundation ready. User story implementation can begin after these tasks are complete.
 
-- [ ] T005 Define the shared dataclasses and enums from the data model in `src/feasibility/models.py`, including `AnalysisRequest`, `EvidenceItem`, `Finding`, `FeasibilityAssessment`, and history records.
+- [X] T005 Define the shared dataclasses and enums from the data model in `src/feasibility/models.py`, including `AnalysisRequest`, `EvidenceItem`, `Finding`, `FeasibilityAssessment`, and history records.
 - [ ] T006 Implement bounded read-only file discovery in `src/feasibility/discovery.py`, including directory exclusions, file-size limits, symlink policy, readable-text checks, normalized relative paths, and explicit unreadable or out-of-scope records.
 - [ ] T007 Implement evidence capture and validation in `src/feasibility/evidence.py`, including inclusive line ranges, bounded excerpts, SHA-256 file hashes, evidence kinds, and source-relative paths.
 - [ ] T008 Define the AI analysis provider boundary and structured response validation in `src/feasibility/ai_analysis.py`, requiring conclusions, findings, evidence references, assumptions, limitations, estimates, and suggestions without requiring language-specific parsers.
