@@ -75,6 +75,21 @@ def test_analysis_prompt_retries_unavailable_path_and_blank_change(tmp_path):
     assert "Requested change cannot be blank. Please try again." in output
 
 
+def test_analysis_prompt_explains_that_a_file_is_not_a_codebase_root(tmp_path):
+    source_file = tmp_path / "script.js"
+    source_file.write_text("console.log('ok');\n", encoding="utf-8")
+    answers = iter([str(source_file), str(tmp_path), "Review the script", "", "no"])
+    output = []
+
+    request_input = prompt_analysis_request(
+        input_fn=lambda _: next(answers),
+        output_fn=output.append,
+    )
+
+    assert request_input["codebase_path"] == str(tmp_path)
+    assert any("Codebase path must be a directory, not a file." in message for message in output)
+
+
 def test_session_ends_cleanly_when_interrupted():
     output = []
 
@@ -108,3 +123,14 @@ def test_analysis_context_preserves_request_and_discovered_scope(tmp_path):
     assert context.additional_context == "Cache values for one minute."
     assert [item.relative_path for item in context.discovery.files] == ["module.py"]
     assert context.request.scope_rules.allowed_extensions == ("py",)
+
+
+def test_menu_option_one_runs_analysis_workflow(tmp_path):
+    (tmp_path / "module.py").write_text("value = 1\n", encoding="utf-8")
+    inputs = iter(["1", str(tmp_path), "Change value", "", "no", "3"])
+    output = []
+
+    run_interactive_session(input_fn=lambda _: next(inputs), output_fn=output.append)
+
+    assert "Analysis request prepared." in output
+    assert "Discovered files: 1" in output

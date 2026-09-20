@@ -29,7 +29,10 @@ def _prompt_codebase_path(
         path = Path(codebase_path).expanduser()
         if codebase_path and path.is_dir():
             return codebase_path
-        output_fn("Codebase path is unavailable. Please try again.")
+        if codebase_path and path.is_file():
+            output_fn("Codebase path must be a directory, not a file. Please try again.")
+        else:
+            output_fn("Codebase path is unavailable. Please try again.")
 
 
 def _prompt_required_change(
@@ -96,6 +99,25 @@ def prepare_interactive_analysis(
     )
 
 
+def run_analysis_interaction(
+    *,
+    input_fn: InputFunction = input,
+    output_fn: OutputFunction = print,
+    principal_id: str = "local-developer",
+) -> Any:
+    """Prepare one interactive request and display its discovered scope."""
+
+    context = prepare_interactive_analysis(
+        principal_id=principal_id,
+        input_fn=input_fn,
+        output_fn=output_fn,
+    )
+    output_fn("Analysis request prepared.")
+    output_fn(f"Discovered files: {len(context.discovery.files)}")
+    output_fn(f"Discovery issues: {len(context.discovery.issues)}")
+    return context
+
+
 def run_interactive_session(
     *,
     input_fn: InputFunction = input,
@@ -109,6 +131,12 @@ def run_interactive_session(
     navigation, which are implemented by their respective workflow tasks.
     """
 
+    if analyze_action is None:
+        analyze_action = lambda: run_analysis_interaction(
+            input_fn=input_fn,
+            output_fn=output_fn,
+        )
+
     while True:
         for option in _MENU_OPTIONS:
             output_fn(option)
@@ -121,8 +149,7 @@ def run_interactive_session(
 
         if choice == "1":
             try:
-                if analyze_action is not None:
-                    analyze_action()
+                analyze_action()
             except (EOFError, KeyboardInterrupt):
                 output_fn("Session ended.")
                 return
@@ -142,5 +169,6 @@ def run_interactive_session(
 __all__ = [
     "prepare_interactive_analysis",
     "prompt_analysis_request",
+    "run_analysis_interaction",
     "run_interactive_session",
 ]

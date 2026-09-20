@@ -52,7 +52,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T014 [US1] Implement guided prompts for repository path, requested change, optional context, and report-save preference in `src/feasibility/interactive.py`.
 - [X] T015 [US1] Implement input validation and retry behavior for blank changes, unavailable paths, invalid menu choices, and interrupted sessions in `src/feasibility/interactive.py`.
 - [X] T016 [US1] Connect the interactive analysis prompt to request creation and bounded discovery in `src/feasibility/workflow.py`, preserving the exact requested change and evaluated scope.
-- [ ] T017 [US1] Add the executable module entry point in `src/feasibility/__main__.py`, starting the interactive session without parsing command-line arguments or flags.
+- [X] T017 [US1] Add the executable module entry point in `src/feasibility/__main__.py`, starting the interactive session without parsing command-line arguments or flags.
 
 **Checkpoint**: A Developer can submit an analysis request interactively and the system can produce a validated, read-only analysis context.
 
