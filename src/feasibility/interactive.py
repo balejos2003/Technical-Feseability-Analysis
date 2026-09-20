@@ -10,11 +10,29 @@ InputFunction = Callable[[str], str]
 OutputFunction = Callable[[str], Any]
 ActionFunction = Callable[[], Any]
 
+AnalysisInput = dict[str, str | bool]
+
 _MENU_OPTIONS = (
     "1. Analyze a change",
     "2. Consult analysis history",
     "3. Exit",
 )
+
+
+def prompt_analysis_request(*, input_fn: InputFunction = input) -> AnalysisInput:
+    """Collect the inputs needed to start one analysis request."""
+
+    codebase_path = input_fn("Codebase path: ").strip()
+    requested_change = input_fn("Requested change: ").strip()
+    additional_context = input_fn("Optional additional context: ").strip()
+    save_answer = input_fn("Save report outside the codebase? ").strip().lower()
+
+    return {
+        "codebase_path": codebase_path,
+        "requested_change": requested_change,
+        "additional_context": additional_context,
+        "save_report": save_answer in {"yes", "y", "sim", "s"},
+    }
 
 
 def run_interactive_session(
@@ -52,4 +70,4 @@ def run_interactive_session(
             output_fn("Invalid menu choice. Please select 1, 2, or 3.")
 
 
-__all__ = ["run_interactive_session"]
+__all__ = ["prompt_analysis_request", "run_interactive_session"]
