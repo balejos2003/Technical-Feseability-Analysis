@@ -75,6 +75,27 @@ def prompt_analysis_request(
     }
 
 
+def prepare_interactive_analysis(
+    *,
+    principal_id: str,
+    request_id: str | None = None,
+    input_fn: InputFunction = input,
+    output_fn: OutputFunction = print,
+    scope_rules: Any = None,
+) -> Any:
+    """Collect analysis inputs and prepare their read-only discovery context."""
+
+    from .workflow import prepare_analysis_context
+
+    request_input = prompt_analysis_request(input_fn=input_fn, output_fn=output_fn)
+    return prepare_analysis_context(
+        request_input,
+        principal_id=principal_id,
+        request_id=request_id,
+        scope_rules=scope_rules,
+    )
+
+
 def run_interactive_session(
     *,
     input_fn: InputFunction = input,
@@ -118,4 +139,8 @@ def run_interactive_session(
             output_fn("Invalid menu choice. Please select 1, 2, or 3.")
 
 
-__all__ = ["prompt_analysis_request", "run_interactive_session"]
+__all__ = [
+    "prepare_interactive_analysis",
+    "prompt_analysis_request",
+    "run_interactive_session",
+]
