@@ -66,7 +66,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 
 ### Implementation for User Story 2
 
-- [ ] T018 [P] [US2] Implement bounded source-context preparation for the AI in `src/feasibility/context.py`, preserving file paths, line ranges, excerpts, hashes, exclusions, and context-size limits.
+- [X] T018 [P] [US2] Implement bounded source-context preparation for the AI in `src/feasibility/context.py`, preserving file paths, line ranges, excerpts, hashes, exclusions, and context-size limits.
 - [ ] T019 [P] [US2] Implement the analysis prompt and provider invocation in `src/feasibility/ai_analysis.py`, instructing the AI to interpret structure directly and cite supplied evidence for every material finding.
 - [ ] T020 [US2] Implement AI response normalization and validation in `src/feasibility/ai_analysis.py`, rejecting unsupported conclusion categories, uncited material findings, unlabeled estimates, and missing limitations.
 - [ ] T021 [US2] Implement the end-to-end analysis workflow in `src/feasibility/workflow.py`, connecting discovery, context preparation, AI interpretation, evidence validation, and report rendering.
