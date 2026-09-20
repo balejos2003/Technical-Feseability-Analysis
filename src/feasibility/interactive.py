@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 
@@ -19,19 +20,58 @@ _MENU_OPTIONS = (
 )
 
 
-def prompt_analysis_request(*, input_fn: InputFunction = input) -> AnalysisInput:
+def _prompt_codebase_path(
+    input_fn: InputFunction,
+    output_fn: OutputFunction,
+) -> str:
+    while True:
+        codebase_path = input_fn("Codebase path: ").strip()
+        path = Path(codebase_path).expanduser()
+        if codebase_path and path.is_dir():
+            return codebase_path
+        output_fn("Codebase path is unavailable. Please try again.")
+
+
+def _prompt_required_change(
+    input_fn: InputFunction,
+    output_fn: OutputFunction,
+) -> str:
+    while True:
+        requested_change = input_fn("Requested change: ").strip()
+        if requested_change:
+            return requested_change
+        output_fn("Requested change cannot be blank. Please try again.")
+
+
+def _prompt_save_preference(
+    input_fn: InputFunction,
+    output_fn: OutputFunction,
+) -> bool:
+    while True:
+        save_answer = input_fn("Save report outside the codebase? ").strip().lower()
+        if save_answer in {"yes", "y", "sim", "s"}:
+            return True
+        if save_answer in {"no", "n", "nao", "não"}:
+            return False
+        output_fn("Please answer yes or no.")
+
+
+def prompt_analysis_request(
+    *,
+    input_fn: InputFunction = input,
+    output_fn: OutputFunction = print,
+) -> AnalysisInput:
     """Collect the inputs needed to start one analysis request."""
 
-    codebase_path = input_fn("Codebase path: ").strip()
-    requested_change = input_fn("Requested change: ").strip()
+    codebase_path = _prompt_codebase_path(input_fn, output_fn)
+    requested_change = _prompt_required_change(input_fn, output_fn)
     additional_context = input_fn("Optional additional context: ").strip()
-    save_answer = input_fn("Save report outside the codebase? ").strip().lower()
 
     return {
         "codebase_path": codebase_path,
         "requested_change": requested_change,
         "additional_context": additional_context,
-        "save_report": save_answer in {"yes", "y", "sim", "s"},
+        "save_report": _prompt_save_preference(input_fn, output_fn),
     }
 
 
@@ -59,11 +99,19 @@ def run_interactive_session(
             return
 
         if choice == "1":
-            if analyze_action is not None:
-                analyze_action()
+            try:
+                if analyze_action is not None:
+                    analyze_action()
+            except (EOFError, KeyboardInterrupt):
+                output_fn("Session ended.")
+                return
         elif choice == "2":
-            if history_action is not None:
-                history_action()
+            try:
+                if history_action is not None:
+                    history_action()
+            except (EOFError, KeyboardInterrupt):
+                output_fn("Session ended.")
+                return
         elif choice == "3":
             return
         else:
