@@ -36,7 +36,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T009 Implement SQLite schema creation and connection handling in `src/feasibility/storage.py`, including request, assessment, evidence, finding, and finding-evidence records with analyzer versioning.
 - [X] T010 Implement principal-scoped persistence queries in `src/feasibility/history.py`, ensuring every list, search, and show operation filters by `principal_id` and completed assessments are immutable history snapshots.
 - [X] T011 Implement Markdown report rendering in `src/feasibility/reports.py` according to `contracts/report.md`, with stable headings and explicit evidence references for material findings.
-- [ ] T012 Implement application-level error types and structured failure handling in `src/feasibility/errors.py`, covering invalid paths, unreadable files, unavailable AI responses, invalid AI output, and unauthorized history access.
+- [X] T012 Implement application-level error types and structured failure handling in `src/feasibility/errors.py`, covering invalid paths, unreadable files, unavailable AI responses, invalid AI output, and unauthorized history access.
 
 ---
 
