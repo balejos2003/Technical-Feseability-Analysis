@@ -35,7 +35,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T008 Define the AI analysis provider boundary and structured response validation in `src/feasibility/ai_analysis.py`, requiring conclusions, findings, evidence references, assumptions, limitations, estimates, and suggestions without requiring language-specific parsers.
 - [X] T009 Implement SQLite schema creation and connection handling in `src/feasibility/storage.py`, including request, assessment, evidence, finding, and finding-evidence records with analyzer versioning.
 - [X] T010 Implement principal-scoped persistence queries in `src/feasibility/history.py`, ensuring every list, search, and show operation filters by `principal_id` and completed assessments are immutable history snapshots.
-- [ ] T011 Implement Markdown report rendering in `src/feasibility/reports.py` according to `contracts/report.md`, with stable headings and explicit evidence references for material findings.
+- [X] T011 Implement Markdown report rendering in `src/feasibility/reports.py` according to `contracts/report.md`, with stable headings and explicit evidence references for material findings.
 - [ ] T012 Implement application-level error types and structured failure handling in `src/feasibility/errors.py`, covering invalid paths, unreadable files, unavailable AI responses, invalid AI output, and unauthorized history access.
 
 ---

@@ -204,6 +204,7 @@ class FeasibilityAssessment:
     limitations: list[str]
     report_markdown: str
     analyzer_version: str
+    evidence_items: list[EvidenceItem] = field(default_factory=list)
     created_at: datetime = field(default_factory=utc_now)
     status: AssessmentStatus = AssessmentStatus.COMPLETED
 
