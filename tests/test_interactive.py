@@ -1,6 +1,8 @@
+import hashlib
+
 from feasibility.interactive import prompt_analysis_request, run_interactive_session
 from feasibility.models import ScopeRules
-from feasibility.workflow import prepare_analysis_context
+from feasibility.workflow import prepare_analysis_context, run_analysis_workflow
 
 
 def test_session_exits_from_main_menu():
@@ -134,3 +136,65 @@ def test_menu_option_one_runs_analysis_workflow(tmp_path):
 
     assert "Analysis request prepared." in output
     assert "Discovered files: 1" in output
+
+
+def test_run_analysis_workflow_creates_assessment_and_report(tmp_path):
+    source_file = tmp_path / "service.py"
+    source_text = "def connect():\n    return 1\n"
+    source_file.write_text(source_text, encoding="utf-8")
+    file_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+
+    request_input = {
+        "codebase_path": str(tmp_path),
+        "requested_change": "Add a small adapter around the service",
+        "additional_context": "The API contract is stable.",
+        "save_report": False,
+    }
+
+    def provider(prompt):
+        return {
+            "conclusion": "conditionally_feasible",
+            "findings": [
+                {
+                    "id": "f-1",
+                    "category": "interpretation",
+                    "statement": "The change is feasible with a small adapter.",
+                    "basis": "The service exposes a clear integration seam.",
+                    "uncertainty": "Low uncertainty.",
+                    "severity": "medium",
+                    "evidence": [
+                        {
+                            "id": "ev-1",
+                            "kind": "code",
+                            "path": "service.py",
+                            "start_line": 1,
+                            "end_line": 2,
+                            "excerpt": source_text,
+                            "hash": file_hash,
+                            "description": "The adapter point is defined directly in the service entry point.",
+                        }
+                    ],
+                }
+            ],
+            "limitations": ["Runtime behavior remains untested."],
+            "assumptions": ["The existing API contract is stable."],
+            "estimates": [
+                {
+                    "label": "Implementation effort",
+                    "value": "2-4 days",
+                    "basis": "Single integration seam and limited surface.",
+                    "uncertainty": "Medium.",
+                }
+            ],
+            "suggestions": ["Add a thin adapter and verify the contract end-to-end."],
+            "unresolved_questions": ["What is the production contract version?"],
+        }
+
+    assessment = run_analysis_workflow(request_input, principal_id="alice", provider=provider)
+
+    assert assessment.conclusion.value == "conditionally_feasible"
+    assert len(assessment.findings) == 1
+    assert assessment.evidence_items[0].path == "service.py"
+    assert "# Technical Feasibility Assessment" in assessment.report_markdown
+    assert "## Findings" in assessment.report_markdown
+    assert "Implementation effort" in assessment.report_markdown

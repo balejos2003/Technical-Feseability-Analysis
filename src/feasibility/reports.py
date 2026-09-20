@@ -69,24 +69,46 @@ def render_report(assessment: FeasibilityAssessment) -> str:
             lines.append("#### Evidence")
             lines.extend(_render_evidence_lines(assessment, finding) or ["- Evidence: not available"])
 
-    lines.extend([
-        "## Estimates",
-        "No estimates were supplied.",
-        "## Suggestions",
-        "No suggestions were supplied.",
-        "## Risks and Limitations",
-    ])
+    lines.append("## Estimates")
+    if assessment.estimates:
+        for estimate in assessment.estimates:
+            lines.append(f"- {estimate.get('label', 'Estimate')}: {estimate.get('value', '')}")
+            lines.append(f"  Basis: {estimate.get('basis', 'No basis provided.')}")
+            uncertainty = estimate.get("uncertainty")
+            if uncertainty:
+                lines.append(f"  Uncertainty: {uncertainty}")
+    else:
+        lines.append("No estimates were supplied.")
+
+    lines.append("## Suggestions")
+    if assessment.suggestions:
+        for suggestion in assessment.suggestions:
+            lines.append(f"- {suggestion}")
+    else:
+        lines.append("No suggestions were supplied.")
+
+    lines.extend(["## Risks and Limitations"])
     if assessment.limitations:
         for limitation in assessment.limitations:
             lines.append(f"- {limitation}")
     else:
         lines.append("No limitations were identified.")
 
+    lines.append("## Assumptions")
+    if assessment.assumptions:
+        for assumption in assessment.assumptions:
+            lines.append(f"- {assumption}")
+    else:
+        lines.append("No explicit assumptions were recorded.")
+
+    lines.append("## Unresolved Questions")
+    if assessment.unresolved_questions:
+        for question in assessment.unresolved_questions:
+            lines.append(f"- {question}")
+    else:
+        lines.append("No unresolved questions were recorded.")
+
     lines.extend([
-        "## Assumptions",
-        "No explicit assumptions were recorded.",
-        "## Unresolved Questions",
-        "No unresolved questions were recorded.",
         "## Developer Review",
         "This result is advisory and no codebase change was applied by the analysis.",
     ])

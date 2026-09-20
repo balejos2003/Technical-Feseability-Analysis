@@ -205,6 +205,10 @@ class FeasibilityAssessment:
     report_markdown: str
     analyzer_version: str
     evidence_items: list[EvidenceItem] = field(default_factory=list)
+    assumptions: list[str] = field(default_factory=list)
+    estimates: list[dict[str, str]] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
+    unresolved_questions: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=utc_now)
     status: AssessmentStatus = AssessmentStatus.COMPLETED
 
