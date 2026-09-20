@@ -120,3 +120,90 @@ def test_invoke_analysis_provider_builds_prompt_from_bounded_context(tmp_path):
     assert "Add caching to calculate" in prompts[0]
     assert "module.py lines 1-2" in prompts[0]
     assert "Do not modify the repository" in prompts[0]
+
+
+def test_normalize_rejects_missing_limitations():
+    payload = {
+        "conclusion": "feasible",
+        "findings": [
+            {
+                "id": "f-1",
+                "category": "fact",
+                "statement": "The entry point exists.",
+                "basis": "The supplied source contains the entry point.",
+                "evidence": [{"id": "ev-1", "kind": "code"}],
+            }
+        ],
+        "assumptions": [],
+        "estimates": [],
+        "suggestions": [],
+    }
+
+    try:
+        normalize_analysis_response(payload)
+        assert False, "Expected ValueError for missing limitations"
+    except ValueError as exc:
+        assert "limitations" in str(exc)
+
+
+def test_normalize_rejects_estimate_without_label():
+    payload = {
+        "conclusion": "conditionally_feasible",
+        "findings": [
+            {
+                "id": "f-1",
+                "category": "estimate",
+                "statement": "The change is small.",
+                "basis": "Only one module is involved.",
+                "evidence": [{"id": "ev-1", "kind": "code"}],
+            }
+        ],
+        "limitations": ["Runtime behavior was not tested."],
+        "assumptions": [],
+        "estimates": [{"value": "1 day", "basis": "One module."}],
+        "suggestions": [],
+    }
+
+    try:
+        normalize_analysis_response(payload)
+        assert False, "Expected ValueError for unlabeled estimate"
+    except ValueError as exc:
+        assert "label" in str(exc)
+
+
+def test_normalize_rejects_evidence_outside_supplied_context(tmp_path):
+    source_file = tmp_path / "module.py"
+    source_file.write_text("value = 1\n", encoding="utf-8")
+    source_context = prepare_source_context(tmp_path, discover_repository(tmp_path))
+    payload = {
+        "conclusion": "feasible",
+        "findings": [
+            {
+                "id": "f-1",
+                "category": "fact",
+                "statement": "The unrelated file controls the behavior.",
+                "basis": "The provider cited a file outside the supplied context.",
+                "evidence": [
+                    {
+                        "id": "ev-1",
+                        "kind": "code",
+                        "path": "outside.py",
+                        "start_line": 1,
+                        "end_line": 1,
+                        "excerpt": "value = 2",
+                        "hash": "not-from-context",
+                    }
+                ],
+            }
+        ],
+        "limitations": ["The context was bounded."],
+        "assumptions": [],
+        "estimates": [],
+        "suggestions": [],
+    }
+
+    try:
+        normalize_analysis_response(payload, source_context=source_context)
+        assert False, "Expected ValueError for evidence outside context"
+    except ValueError as exc:
+        assert "context" in str(exc)

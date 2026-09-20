@@ -173,7 +173,37 @@ def _to_finding(item: dict[str, Any]) -> Finding:
     )
 
 
-def normalize_analysis_response(payload: dict[str, Any]) -> AnalysisResponse:
+def _validate_context_evidence(
+    findings: list[dict[str, Any]],
+    source_context: SourceContext,
+) -> None:
+    context_by_path = {item.path: item for item in source_context.items}
+    for finding in findings:
+        for evidence in finding.get("evidence") or []:
+            if not isinstance(evidence, dict) or evidence.get("kind") != EvidenceKind.CODE.value:
+                continue
+
+            path = str(evidence.get("path") or "")
+            context_item = context_by_path.get(path)
+            if context_item is None:
+                raise ValueError(f"Evidence path is outside the supplied context: {path}")
+
+            start_line = evidence.get("start_line")
+            end_line = evidence.get("end_line")
+            if start_line is None or end_line is None:
+                raise ValueError(f"Evidence range is missing from the supplied context: {path}")
+            if start_line < context_item.start_line or end_line > context_item.end_line:
+                raise ValueError(f"Evidence range is outside the supplied context: {path}")
+
+            if evidence.get("hash") and evidence["hash"] != context_item.file_hash:
+                raise ValueError(f"Evidence hash does not match the supplied context: {path}")
+
+
+def normalize_analysis_response(
+    payload: dict[str, Any],
+    *,
+    source_context: SourceContext | None = None,
+) -> AnalysisResponse:
     """Normalize and validate a provider response structure."""
 
     if not isinstance(payload, dict):
@@ -185,7 +215,11 @@ def normalize_analysis_response(payload: dict[str, Any]) -> AnalysisResponse:
         raise ValueError("AI response requires at least one finding")
 
     normalized_findings = [_to_finding(item) for item in findings]
+    if source_context is not None:
+        _validate_context_evidence(findings, source_context)
 
+    if "limitations" not in payload:
+        raise ValueError("AI response requires limitations")
     limitations = payload.get("limitations") or []
     if not isinstance(limitations, list):
         raise ValueError("limitations must be a list")
