@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping
 from typing import Any
 
+from .context import SourceContext
+from .errors import AIServiceUnavailableError
 from .models import (
+    AnalysisRequest,
     EvidenceItem,
     EvidenceKind,
     FeasibilityAssessment,
@@ -14,6 +18,9 @@ from .models import (
     FindingCategory,
     Severity,
 )
+
+
+Provider = Callable[[str], Mapping[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -93,6 +100,43 @@ def build_analysis_prompt(
         "Provided context:\n"
         f"{context}\n"
     )
+
+
+def invoke_analysis_provider(
+    request: AnalysisRequest,
+    source_context: SourceContext,
+    *,
+    provider: Provider,
+) -> dict[str, Any]:
+    """Build the bounded analysis prompt and invoke the injected AI provider.
+
+    The provider receives only the rendered source snapshot and request metadata.
+    Response normalization is intentionally deferred to ``normalize_analysis_response``.
+    """
+
+    scope_summary = (
+        f"{len(source_context.items)} files included, "
+        f"{len(source_context.issues)} discovery issues, "
+        f"{source_context.total_chars}/{source_context.max_context_chars} characters"
+    )
+    prompt = build_analysis_prompt(
+        repository_root=request.codebase_root,
+        change_description=request.change_description,
+        scope_summary=scope_summary,
+        context=source_context.as_text(),
+    )
+
+    try:
+        response = provider(prompt)
+    except (ConnectionError, OSError, TimeoutError) as exc:
+        raise AIServiceUnavailableError(
+            "The AI analysis provider is unavailable",
+            provider=type(provider).__name__,
+        ) from exc
+
+    if not isinstance(response, Mapping):
+        raise TypeError("AI provider must return a mapping response")
+    return dict(response)
 
 
 def _coerce_conclusion(value: Any) -> FeasibilityConclusion:
@@ -183,5 +227,6 @@ __all__ = [
     "AnalysisEvidenceRef",
     "AnalysisResponse",
     "build_analysis_prompt",
+    "invoke_analysis_provider",
     "normalize_analysis_response",
 ]

@@ -1,8 +1,12 @@
 from feasibility.ai_analysis import (
     AnalysisResponse,
     build_analysis_prompt,
+    invoke_analysis_provider,
     normalize_analysis_response,
 )
+from feasibility.context import prepare_source_context
+from feasibility.discovery import discover_repository
+from feasibility.models import AnalysisRequest
 from feasibility.models import EvidenceKind, FeasibilityConclusion, FindingCategory
 
 
@@ -90,3 +94,29 @@ def test_normalize_analysis_response_rejects_missing_evidence():
         assert False, "Expected ValueError for uncited material finding"
     except ValueError:
         pass
+
+
+def test_invoke_analysis_provider_builds_prompt_from_bounded_context(tmp_path):
+    source_file = tmp_path / "module.py"
+    source_file.write_text("def calculate():\n    return 1\n", encoding="utf-8")
+    discovery = discover_repository(tmp_path)
+    source_context = prepare_source_context(tmp_path, discovery)
+    request = AnalysisRequest(
+        request_id="request-1",
+        principal_id="developer-1",
+        codebase_root=str(tmp_path),
+        change_description="Add caching to calculate",
+    )
+    prompts = []
+
+    def provider(prompt):
+        prompts.append(prompt)
+        return {"conclusion": "feasible"}
+
+    response = invoke_analysis_provider(request, source_context, provider=provider)
+
+    assert response == {"conclusion": "feasible"}
+    assert len(prompts) == 1
+    assert "Add caching to calculate" in prompts[0]
+    assert "module.py lines 1-2" in prompts[0]
+    assert "Do not modify the repository" in prompts[0]
