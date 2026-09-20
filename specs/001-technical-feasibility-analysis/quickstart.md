@@ -14,7 +14,7 @@ flags.
 ## Scenario 1: Analyze without modifying the codebase
 
 ```bash
-python -m feasibility
+PYTHONPATH=src python -m feasibility
 ```
 
 Answer the prompts with:
@@ -40,7 +40,7 @@ Expected outcomes:
 ## Scenario 2: Store and retrieve history
 
 ```bash
-python -m feasibility
+PYTHONPATH=src python -m feasibility
 ```
 
 Choose `2. Consult analysis history`, then select one of the history actions:
@@ -63,7 +63,7 @@ Expected outcomes:
 ## Scenario 3: Unsupported and incomplete evidence
 
 ```bash
-python -m feasibility
+PYTHONPATH=src python -m feasibility
 ```
 
 Choose `1. Analyze a change` and provide `./fixtures/unsupported-repo` plus
