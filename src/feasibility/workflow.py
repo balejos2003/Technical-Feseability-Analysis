@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from .ai_analysis import invoke_analysis_provider, normalize_analysis_response
+from .config import application_paths
 from .context import SourceContext, prepare_source_context
 from .discovery import DiscoveryResult, discover_repository
 from .errors import AIServiceUnavailableError
@@ -22,6 +23,7 @@ from .models import (
     ScopeRules,
 )
 from .reports import render_report
+from .storage import save_analysis_record
 
 
 @dataclass(frozen=True)
@@ -207,9 +209,9 @@ def run_analysis_workflow(
     rendered_report = render_report(assessment)
     object.__setattr__(assessment, "report_markdown", rendered_report)
 
-    if context.save_report:
-        from .config import application_paths
+    save_analysis_record(context.request, assessment, database_path=application_paths().database_path)
 
+    if context.save_report:
         report_dir = application_paths().reports_dir
         report_dir.mkdir(parents=True, exist_ok=True)
         report_path = report_dir / f"{assessment.assessment_id}.md"
