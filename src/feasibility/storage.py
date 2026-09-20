@@ -20,6 +20,73 @@ def ensure_database(database_path: str | Path) -> Path:
     return path
 
 
+def _initialize_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS request (
+            request_id TEXT PRIMARY KEY,
+            principal_id TEXT NOT NULL,
+            codebase_root TEXT NOT NULL,
+            change_description TEXT NOT NULL,
+            scope_rules TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS assessment (
+            assessment_id TEXT PRIMARY KEY,
+            request_id TEXT NOT NULL,
+            principal_id TEXT NOT NULL,
+            conclusion TEXT NOT NULL,
+            evaluated_scope TEXT NOT NULL,
+            findings TEXT NOT NULL,
+            limitations TEXT NOT NULL,
+            report_markdown TEXT NOT NULL,
+            analyzer_version TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed',
+            FOREIGN KEY (request_id) REFERENCES request(request_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS evidence (
+            evidence_id TEXT PRIMARY KEY,
+            assessment_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            path TEXT,
+            start_line INTEGER,
+            end_line INTEGER,
+            excerpt TEXT,
+            file_hash TEXT,
+            description TEXT NOT NULL,
+            FOREIGN KEY (assessment_id) REFERENCES assessment(assessment_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS finding (
+            finding_id TEXT PRIMARY KEY,
+            assessment_id TEXT NOT NULL,
+            category TEXT NOT NULL,
+            severity TEXT,
+            statement TEXT NOT NULL,
+            basis TEXT NOT NULL,
+            uncertainty TEXT,
+            FOREIGN KEY (assessment_id) REFERENCES assessment(assessment_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS finding_evidence (
+            finding_id TEXT NOT NULL,
+            evidence_id TEXT NOT NULL,
+            PRIMARY KEY (finding_id, evidence_id),
+            FOREIGN KEY (finding_id) REFERENCES finding(finding_id),
+            FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_request_principal ON request(principal_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_assessment_principal ON assessment(principal_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_assessment_conclusion ON assessment(conclusion);
+        CREATE INDEX IF NOT EXISTS idx_assessment_request ON assessment(request_id);
+        """
+    )
+
+
 def get_connection(database_path: str | Path | None = None) -> sqlite3.Connection:
     """Return a SQLite connection configured for application history storage."""
 
@@ -29,6 +96,7 @@ def get_connection(database_path: str | Path | None = None) -> sqlite3.Connectio
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
+    _initialize_schema(conn)
     return conn
 
 
@@ -36,71 +104,8 @@ def initialize_schema(database_path: str | Path | None = None) -> Path:
     """Create the schema used for persisted analysis requests and assessments."""
 
     path = ensure_database(database_path or application_paths().database_path)
-    with get_connection(path) as conn:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS request (
-                request_id TEXT PRIMARY KEY,
-                principal_id TEXT NOT NULL,
-                codebase_root TEXT NOT NULL,
-                change_description TEXT NOT NULL,
-                scope_rules TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS assessment (
-                assessment_id TEXT PRIMARY KEY,
-                request_id TEXT NOT NULL,
-                principal_id TEXT NOT NULL,
-                conclusion TEXT NOT NULL,
-                evaluated_scope TEXT NOT NULL,
-                findings TEXT NOT NULL,
-                limitations TEXT NOT NULL,
-                report_markdown TEXT NOT NULL,
-                analyzer_version TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'completed',
-                FOREIGN KEY (request_id) REFERENCES request(request_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS evidence (
-                evidence_id TEXT PRIMARY KEY,
-                assessment_id TEXT NOT NULL,
-                kind TEXT NOT NULL,
-                path TEXT,
-                start_line INTEGER,
-                end_line INTEGER,
-                excerpt TEXT,
-                file_hash TEXT,
-                description TEXT NOT NULL,
-                FOREIGN KEY (assessment_id) REFERENCES assessment(assessment_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS finding (
-                finding_id TEXT PRIMARY KEY,
-                assessment_id TEXT NOT NULL,
-                category TEXT NOT NULL,
-                severity TEXT,
-                statement TEXT NOT NULL,
-                basis TEXT NOT NULL,
-                uncertainty TEXT,
-                FOREIGN KEY (assessment_id) REFERENCES assessment(assessment_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS finding_evidence (
-                finding_id TEXT NOT NULL,
-                evidence_id TEXT NOT NULL,
-                PRIMARY KEY (finding_id, evidence_id),
-                FOREIGN KEY (finding_id) REFERENCES finding(finding_id),
-                FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_request_principal ON request(principal_id, created_at);
-            CREATE INDEX IF NOT EXISTS idx_assessment_principal ON assessment(principal_id, created_at);
-            CREATE INDEX IF NOT EXISTS idx_assessment_conclusion ON assessment(conclusion);
-            CREATE INDEX IF NOT EXISTS idx_assessment_request ON assessment(request_id);
-            """
-        )
+    with sqlite3.connect(path) as conn:
+        _initialize_schema(conn)
     return path
 
 
