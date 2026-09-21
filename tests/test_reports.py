@@ -94,3 +94,45 @@ def test_render_report_labels_non_code_evidence_and_relevance():
     assert "Evidence type: assumption" in rendered
     assert "no source span available" in rendered
     assert "Relevance: The public API contract remains stable." in rendered
+
+
+def test_render_report_separates_risks_from_limitations():
+    evidence = EvidenceItem(
+        evidence_id="ev-risk",
+        kind=EvidenceKind.CODE,
+        description="The current evaluator processes operations sequentially.",
+        path="src/calculator.py",
+        start_line=4,
+        end_line=6,
+        excerpt="return operation(left, right)",
+        file_hash="risk-hash",
+    )
+    risk = Finding(
+        finding_id="f-risk",
+        category=FindingCategory.RISK,
+        statement="Parentheses may conflict with sequential evaluation.",
+        basis="The current evaluator does not group expressions.",
+        severity=Severity.HIGH,
+        evidence_ids=[evidence.evidence_id],
+    )
+    assessment = FeasibilityAssessment(
+        assessment_id="assess-risk",
+        request_id="req-risk",
+        principal_id="alice",
+        conclusion=FeasibilityConclusion.CONDITIONALLY_FEASIBLE,
+        evaluated_scope=["src/calculator.py"],
+        findings=[risk],
+        limitations=["Runtime behavior was not tested."],
+        report_markdown="placeholder",
+        analyzer_version="1.0.0",
+        evidence_items=[evidence],
+        status=AssessmentStatus.COMPLETED,
+    )
+
+    rendered = render_report(assessment)
+
+    assert "## Risks and Limitations" in rendered
+    assert "### Risks" in rendered
+    assert "- f-risk: Parentheses may conflict with sequential evaluation. (high)" in rendered
+    assert "### Limitations" in rendered
+    assert "- Runtime behavior was not tested." in rendered

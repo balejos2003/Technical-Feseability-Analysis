@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .models import FeasibilityAssessment, FeasibilityConclusion, Finding
+from .models import FeasibilityAssessment, FeasibilityConclusion, Finding, FindingCategory
 
 
 def _conclusion_label(value: FeasibilityConclusion) -> str:
@@ -89,7 +89,17 @@ def render_report(assessment: FeasibilityAssessment) -> str:
     else:
         lines.append("No suggestions were supplied.")
 
-    lines.extend(["## Risks and Limitations"])
+    lines.extend(["## Risks and Limitations", "### Risks"])
+    risks = [finding for finding in assessment.findings if finding.category == FindingCategory.RISK]
+    if risks:
+        for risk in risks:
+            severity = f" ({risk.severity.value})" if risk.severity else ""
+            lines.append(f"- {risk.finding_id}: {risk.statement}{severity}")
+            lines.append(f"  Basis: {risk.basis}")
+    else:
+        lines.append("No risks were identified.")
+
+    lines.append("### Limitations")
     if assessment.limitations:
         for limitation in assessment.limitations:
             lines.append(f"- {limitation}")
