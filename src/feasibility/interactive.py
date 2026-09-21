@@ -6,6 +6,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .ai_analysis import Provider, build_openai_provider
+from .config import application_paths, ensure_output_outside_repository
+from .errors import FeasibilityError
+from .models import FeasibilityAssessment
+from .workflow import prepare_analysis_context, run_analysis_workflow
+
 
 InputFunction = Callable[[str], str]
 OutputFunction = Callable[[str], Any]
@@ -85,12 +91,11 @@ def prepare_interactive_analysis(
     input_fn: InputFunction = input,
     output_fn: OutputFunction = print,
     scope_rules: Any = None,
+    request_input: AnalysisInput | None = None,
 ) -> Any:
     """Collect analysis inputs and prepare their read-only discovery context."""
 
-    from .workflow import prepare_analysis_context
-
-    request_input = prompt_analysis_request(input_fn=input_fn, output_fn=output_fn)
+    request_input = request_input or prompt_analysis_request(input_fn=input_fn, output_fn=output_fn)
     return prepare_analysis_context(
         request_input,
         principal_id=principal_id,
@@ -99,23 +104,76 @@ def prepare_interactive_analysis(
     )
 
 
+def display_report(
+    assessment: FeasibilityAssessment,
+    *,
+    output_fn: OutputFunction = print,
+) -> None:
+    """Display the complete developer-facing Markdown report."""
+
+    output_fn(assessment.report_markdown)
+
+
+def save_external_report(
+    assessment: FeasibilityAssessment,
+    *,
+    repository_root: str | Path,
+    reports_dir: str | Path | None = None,
+) -> Path:
+    """Write a report copy to an application directory outside the codebase."""
+
+    destination_dir = Path(reports_dir).expanduser().resolve() if reports_dir else application_paths().reports_dir
+    destination = ensure_output_outside_repository(
+        destination_dir / f"{assessment.assessment_id}.md",
+        repository_root,
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(assessment.report_markdown, encoding="utf-8")
+    return destination
+
+
 def run_analysis_interaction(
     *,
     input_fn: InputFunction = input,
     output_fn: OutputFunction = print,
     principal_id: str = "local-developer",
-) -> Any:
-    """Prepare one interactive request and display its discovered scope."""
+    assessment: FeasibilityAssessment | None = None,
+    provider: Provider | None = None,
+) -> FeasibilityAssessment | None:
+    """Run one interactive analysis and display its completed report."""
+
+    request_input = prompt_analysis_request(input_fn=input_fn, output_fn=output_fn)
 
     context = prepare_interactive_analysis(
         principal_id=principal_id,
         input_fn=input_fn,
         output_fn=output_fn,
+        request_input=request_input,
     )
     output_fn("Analysis request prepared.")
     output_fn(f"Discovered files: {len(context.discovery.files)}")
     output_fn(f"Discovery issues: {len(context.discovery.issues)}")
-    return context
+    try:
+        completed_assessment = assessment or run_analysis_workflow(
+            request_input,
+            principal_id=principal_id,
+            provider=provider or build_openai_provider(),
+        )
+    except FeasibilityError as exc:
+        output_fn(f"Analysis failed: {exc.message}")
+        return None
+    except (TypeError, ValueError) as exc:
+        output_fn(f"Analysis failed: {exc}")
+        return None
+
+    display_report(completed_assessment, output_fn=output_fn)
+    if context.save_report:
+        report_path = save_external_report(
+            completed_assessment,
+            repository_root=context.request.codebase_root,
+        )
+        output_fn(f"Report copy saved to: {report_path}")
+    return completed_assessment
 
 
 def run_interactive_session(
@@ -124,6 +182,7 @@ def run_interactive_session(
     output_fn: OutputFunction = print,
     analyze_action: ActionFunction | None = None,
     history_action: ActionFunction | None = None,
+    provider: Provider | None = None,
 ) -> None:
     """Run the main menu until the Developer chooses to exit.
 
@@ -135,6 +194,7 @@ def run_interactive_session(
         analyze_action = lambda: run_analysis_interaction(
             input_fn=input_fn,
             output_fn=output_fn,
+            provider=provider,
         )
 
     while True:
@@ -167,8 +227,10 @@ def run_interactive_session(
 
 
 __all__ = [
+    "display_report",
     "prepare_interactive_analysis",
     "prompt_analysis_request",
     "run_analysis_interaction",
     "run_interactive_session",
+    "save_external_report",
 ]

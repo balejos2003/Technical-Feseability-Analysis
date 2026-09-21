@@ -71,6 +71,32 @@ def test_normalize_analysis_response_validates_structure():
     assert result.limits == ["No runtime proof yet."]
 
 
+def test_normalize_analysis_response_accepts_case_variations_from_provider():
+    payload = {
+        "conclusion": "Feasible",
+        "findings": [
+            {
+                "id": "f-case",
+                "category": "Fact",
+                "statement": "The entry point exists.",
+                "basis": "The supplied source contains it.",
+                "severity": "High",
+                "evidence": [{"id": "ev-case", "kind": "Code"}],
+            }
+        ],
+        "limitations": ["Runtime behavior was not tested."],
+        "assumptions": [],
+        "estimates": [],
+        "suggestions": [],
+    }
+
+    result = normalize_analysis_response(payload)
+
+    assert result.conclusion == FeasibilityConclusion.FEASIBLE
+    assert result.findings[0].category == FindingCategory.FACT
+    assert result.findings[0].severity.value == "high"
+
+
 def test_normalize_analysis_response_rejects_missing_evidence():
     payload = {
         "conclusion": "feasible",

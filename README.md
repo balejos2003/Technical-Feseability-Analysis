@@ -46,6 +46,19 @@ linhas, trecho, hash do arquivo e relevância.
 - Python 3.11 ou superior.
 - Dependências e entry point definidos em [pyproject.toml](pyproject.toml).
 - O diretório de dados pode ser configurado com `FEASIBILITY_DATA_DIR`.
+- A análise real usa `OPENAI_API_KEY`; opcionalmente, `OPENAI_MODEL` define o modelo
+  usado, com `gpt-4o-mini` como padrão.
+
+Antes de iniciar uma análise, configure a credencial no ambiente:
+
+```bash
+export OPENAI_API_KEY="sua-chave"
+export OPENAI_MODEL="gpt-4o-mini"
+PYTHONPATH=src python -m feasibility
+```
+
+Sem `OPENAI_API_KEY`, o programa preserva a base analisada e informa que o provider
+não está configurado, sem criar um relatório ou registro incompleto.
 
 ## Validação
 

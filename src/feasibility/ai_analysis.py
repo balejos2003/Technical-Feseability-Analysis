@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from collections.abc import Callable, Mapping
+import json
+import os
 from typing import Any
 
 from .context import SourceContext
@@ -21,6 +23,73 @@ from .models import (
 
 
 Provider = Callable[[str], Mapping[str, Any]]
+
+
+def _normalize_enum_value(value: Any) -> Any:
+    """Normalize provider enum text while preserving non-string values."""
+
+    return value.strip().lower().replace(" ", "_") if isinstance(value, str) else value
+
+
+def build_openai_provider(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+) -> Provider:
+    """Build the configured OpenAI provider without exposing credentials to prompts."""
+
+    resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY")
+    if not resolved_api_key:
+        raise AIServiceUnavailableError(
+            "No OpenAI API key is configured. Set OPENAI_API_KEY before starting an analysis."
+        )
+
+    resolved_model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    try:
+        from openai import OpenAI
+    except ImportError as exc:  # pragma: no cover - depends on environment packaging
+        raise AIServiceUnavailableError(
+            "The OpenAI dependency is not installed.",
+        ) from exc
+
+    client = OpenAI(api_key=resolved_api_key)
+
+    def provider(prompt: str) -> Mapping[str, Any]:
+        try:
+            response = client.chat.completions.create(
+                model=resolved_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Return only a valid JSON object matching the requested analysis contract.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content
+            if not content:
+                raise ValueError("The AI provider returned an empty response.")
+            payload = json.loads(content)
+        except (ConnectionError, OSError, TimeoutError) as exc:
+            raise AIServiceUnavailableError("The OpenAI analysis provider is unavailable.") from exc
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("The OpenAI provider returned invalid JSON.") from exc
+        except Exception as exc:  # pragma: no cover - provider SDK-specific failures
+            error_type = type(exc).__name__
+            status_code = getattr(exc, "status_code", None)
+            status_text = f" (HTTP {status_code})" if status_code else ""
+            raise AIServiceUnavailableError(
+                "The OpenAI analysis provider failed "
+                f"with {error_type}{status_text}: {exc}. "
+                "Check the API key, project billing/credits, model access, and network connection."
+            ) from exc
+
+        if not isinstance(payload, Mapping):
+            raise TypeError("The OpenAI provider must return a JSON object.")
+        return dict(payload)
+
+    return provider
 
 
 @dataclass(frozen=True)
@@ -97,6 +166,15 @@ def build_analysis_prompt(
         "- estimates: list of labeled estimates with value, basis, and uncertainty\n"
         "- suggestions: list of actionable suggestions\n"
         "- unresolved_questions: list of open questions\n\n"
+        "Evidence rule: every finding must include at least one evidence object.\n"
+        "Use only files, line ranges, excerpts, and hashes present in the supplied context.\n"
+        "If a claim cannot be supported by the supplied context, do not create a finding;\n"
+        "record it as a limitation, assumption, or unresolved question instead.\n"
+        "Example finding shape:\n"
+        '{"id":"f-1","category":"fact","statement":"...",'
+        '"basis":"...","evidence":[{"id":"ev-1","kind":"code",'
+        '"path":"src/example.py","start_line":1,"end_line":2,'
+        '"excerpt":"...","hash":"<context hash>","description":"..."}]}\n\n'
         "Provided context:\n"
         f"{context}\n"
     )
@@ -141,15 +219,19 @@ def invoke_analysis_provider(
 
 def _coerce_conclusion(value: Any) -> FeasibilityConclusion:
     try:
-        return FeasibilityConclusion(value)
+        return FeasibilityConclusion(_normalize_enum_value(value))
     except ValueError as exc:  # pragma: no cover - defensive guard
         raise ValueError(f"Unsupported conclusion: {value}") from exc
 
 
-def _to_finding(item: dict[str, Any]) -> Finding:
+def _to_finding(item: dict[str, Any], *, index: int | None = None) -> Finding:
+    finding_label = item.get("id") or (f"#{index + 1}" if index is not None else "<unknown>")
     evidence_values = item.get("evidence") or []
     if not isinstance(evidence_values, list) or not evidence_values:
-        raise ValueError(f"Finding {item.get('id', '<unknown>')} requires at least one evidence item")
+        raise ValueError(
+            f"Finding {finding_label} requires at least one evidence item. "
+            "The AI response was rejected because every material finding must cite supplied evidence."
+        )
 
     evidence_ids = []
     for evidence in evidence_values:
@@ -160,15 +242,15 @@ def _to_finding(item: dict[str, Any]) -> Finding:
             evidence_ids.append(str(evidence_id))
 
     if not evidence_ids:
-        raise ValueError(f"Finding {item.get('id', '<unknown>')} requires evidence ids")
+        raise ValueError(f"Finding {finding_label} requires evidence ids")
 
     return Finding(
         finding_id=str(item.get("id") or "finding"),
-        category=item.get("category", FindingCategory.INTERPRETATION.value),
+        category=_normalize_enum_value(item.get("category", FindingCategory.INTERPRETATION.value)),
         statement=str(item.get("statement") or ""),
         basis=str(item.get("basis") or ""),
         uncertainty=item.get("uncertainty"),
-        severity=item.get("severity"),
+        severity=_normalize_enum_value(item.get("severity")),
         evidence_ids=evidence_ids,
     )
 
@@ -214,7 +296,7 @@ def normalize_analysis_response(
     if not isinstance(findings, list) or not findings:
         raise ValueError("AI response requires at least one finding")
 
-    normalized_findings = [_to_finding(item) for item in findings]
+    normalized_findings = [_to_finding(item, index=index) for index, item in enumerate(findings)]
     if source_context is not None:
         _validate_context_evidence(findings, source_context)
 
@@ -261,6 +343,7 @@ __all__ = [
     "AnalysisEvidenceRef",
     "AnalysisResponse",
     "build_analysis_prompt",
+    "build_openai_provider",
     "invoke_analysis_provider",
     "normalize_analysis_response",
 ]

@@ -1,7 +1,23 @@
 import hashlib
 
-from feasibility.interactive import prompt_analysis_request, run_interactive_session
-from feasibility.models import ScopeRules
+import pytest
+
+from feasibility.ai_analysis import build_openai_provider
+from feasibility.errors import AIServiceUnavailableError
+from feasibility.interactive import (
+    display_report,
+    prompt_analysis_request,
+    save_external_report,
+    run_interactive_session,
+)
+from feasibility.models import (
+    AssessmentStatus,
+    FeasibilityAssessment,
+    FeasibilityConclusion,
+    Finding,
+    FindingCategory,
+    ScopeRules,
+)
 from feasibility.workflow import prepare_analysis_context, run_analysis_workflow
 
 
@@ -138,6 +154,60 @@ def test_menu_option_one_runs_analysis_workflow(tmp_path):
     assert "Discovered files: 1" in output
 
 
+def test_menu_option_one_runs_provider_and_displays_completed_report(tmp_path):
+    source_text = "def calculate():\n    return 1\n"
+    (tmp_path / "module.py").write_text(source_text, encoding="utf-8")
+    file_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+    inputs = iter(["1", str(tmp_path), "Add parentheses", "", "no", "3"])
+
+    def provider(prompt):
+        return {
+            "conclusion": "feasible",
+            "findings": [
+                {
+                    "id": "f-interactive",
+                    "category": "fact",
+                    "statement": "The calculator entry point is available.",
+                    "basis": "The supplied module contains the calculation function.",
+                    "evidence": [
+                        {
+                            "id": "ev-interactive",
+                            "kind": "code",
+                            "path": "module.py",
+                            "start_line": 1,
+                            "end_line": 2,
+                            "excerpt": source_text,
+                            "hash": file_hash,
+                            "description": "The calculation function is the relevant entry point.",
+                        }
+                    ],
+                }
+            ],
+            "limitations": ["Runtime behavior was not tested."],
+            "assumptions": [],
+            "estimates": [],
+            "suggestions": ["Add focused tests for nested parentheses."],
+            "unresolved_questions": [],
+        }
+
+    output = []
+    run_interactive_session(
+        input_fn=lambda _: next(inputs),
+        output_fn=output.append,
+        provider=provider,
+    )
+
+    assert any("# Technical Feasibility Assessment" in message for message in output)
+    assert any("## Developer Review" in message for message in output)
+
+
+def test_openai_provider_requires_api_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(AIServiceUnavailableError, match="OPENAI_API_KEY"):
+        build_openai_provider()
+
+
 def test_run_analysis_workflow_creates_assessment_and_report(tmp_path):
     source_file = tmp_path / "service.py"
     source_text = "def connect():\n    return 1\n"
@@ -198,3 +268,126 @@ def test_run_analysis_workflow_creates_assessment_and_report(tmp_path):
     assert "# Technical Feasibility Assessment" in assessment.report_markdown
     assert "## Findings" in assessment.report_markdown
     assert "Implementation effort" in assessment.report_markdown
+
+
+def test_run_analysis_workflow_retries_uncited_provider_response(tmp_path):
+    source_text = "def calculate():\n    return 1\n"
+    (tmp_path / "module.py").write_text(source_text, encoding="utf-8")
+    file_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+    responses = iter(
+        [
+            {
+                "conclusion": "feasible",
+                "findings": [{"id": "f-1", "category": "fact", "statement": "Uncited", "basis": "Missing evidence."}],
+                "limitations": ["The first response was incomplete."],
+            },
+            {
+                "conclusion": "feasible",
+                "findings": [
+                    {
+                        "id": "f-1",
+                        "category": "fact",
+                        "statement": "The calculator entry point exists.",
+                        "basis": "The supplied module contains the function.",
+                        "evidence": [
+                            {
+                                "id": "ev-1",
+                                "kind": "code",
+                                "path": "module.py",
+                                "start_line": 1,
+                                "end_line": 2,
+                                "excerpt": source_text,
+                                "hash": file_hash,
+                                "description": "The function is the relevant entry point.",
+                            }
+                        ],
+                    }
+                ],
+                "limitations": ["Runtime behavior was not tested."],
+                "assumptions": [],
+                "estimates": [],
+                "suggestions": [],
+                "unresolved_questions": [],
+            },
+        ]
+    )
+    prompts = []
+
+    def provider(prompt):
+        prompts.append(prompt)
+        return next(responses)
+
+    assessment = run_analysis_workflow(
+        {
+            "codebase_path": str(tmp_path),
+            "requested_change": "Add parentheses",
+            "additional_context": "",
+            "save_report": False,
+        },
+        principal_id="alice",
+        provider=provider,
+    )
+
+    assert assessment.conclusion.value == "feasible"
+    assert len(prompts) == 2
+    assert "CORRECTION REQUIRED" in prompts[1]
+
+
+def test_display_report_outputs_complete_markdown_report():
+    assessment = FeasibilityAssessment(
+        assessment_id="assess-display",
+        request_id="request-display",
+        principal_id="alice",
+        conclusion=FeasibilityConclusion.FEASIBLE,
+        evaluated_scope=["service.py"],
+        findings=[
+            Finding(
+                finding_id="finding-display",
+                category=FindingCategory.FACT,
+                statement="The service entry point exists.",
+                basis="The supplied source contains the entry point.",
+                evidence_ids=["evidence-display"],
+            )
+        ],
+        limitations=["Runtime behavior was not tested."],
+        report_markdown="# Technical Feasibility Assessment\n\n## Conclusion\nFeasible\n",
+        analyzer_version="1.0.0",
+        status=AssessmentStatus.COMPLETED,
+    )
+    output = []
+
+    display_report(assessment, output_fn=output.append)
+
+    assert output == [assessment.report_markdown]
+
+
+def test_save_external_report_writes_copy_outside_codebase(tmp_path):
+    assessment = FeasibilityAssessment(
+        assessment_id="assess-copy",
+        request_id="request-copy",
+        principal_id="alice",
+        conclusion=FeasibilityConclusion.FEASIBLE,
+        evaluated_scope=["service.py"],
+        findings=[
+            Finding(
+                finding_id="finding-copy",
+                category=FindingCategory.FACT,
+                statement="The service entry point exists.",
+                basis="The supplied source contains the entry point.",
+                evidence_ids=["evidence-copy"],
+            )
+        ],
+        limitations=["Runtime behavior was not tested."],
+        report_markdown="# Technical Feasibility Assessment\n",
+        analyzer_version="1.0.0",
+        status=AssessmentStatus.COMPLETED,
+    )
+
+    report_path = save_external_report(
+        assessment,
+        repository_root=tmp_path / "codebase",
+        reports_dir=tmp_path / "reports",
+    )
+
+    assert report_path == (tmp_path / "reports" / "assess-copy.md").resolve()
+    assert report_path.read_text(encoding="utf-8") == assessment.report_markdown

@@ -101,7 +101,7 @@ def _evidence_items_from_payload(
             if evidence_id in evidence_index:
                 continue
 
-            kind_value = str(evidence.get("kind") or EvidenceKind.CODE.value)
+            kind_value = str(evidence.get("kind") or EvidenceKind.CODE.value).strip().lower().replace(" ", "_")
             try:
                 kind = EvidenceKind(kind_value)
             except ValueError:
@@ -187,7 +187,25 @@ def run_analysis_workflow(
     payload_provider = provider or (lambda _prompt: (_ for _ in ()).throw(AIServiceUnavailableError("No AI provider configured.")))
     prompt_request = _build_prompt_request(context.request, context.additional_context)
     raw_response = invoke_analysis_provider(prompt_request, source_context, provider=payload_provider)
-    normalized = normalize_analysis_response(raw_response, source_context=source_context)
+    try:
+        normalized = normalize_analysis_response(raw_response, source_context=source_context)
+    except ValueError as exc:
+        if "requires at least one evidence item" not in str(exc):
+            raise
+
+        correction = (
+            "\n\nCORRECTION REQUIRED: Your previous response contained a finding without evidence. "
+            "Return the complete JSON response again. Every finding must include at least one "
+            "evidence object citing an exact file path, inclusive line range, excerpt, and hash "
+            "from the supplied context. If evidence is unavailable, omit that finding and put "
+            "the issue in limitations or unresolved_questions.\n"
+        )
+        raw_response = invoke_analysis_provider(
+            prompt_request,
+            source_context,
+            provider=lambda prompt: payload_provider(prompt + correction),
+        )
+        normalized = normalize_analysis_response(raw_response, source_context=source_context)
 
     evidence_items, _ = _evidence_items_from_payload(raw_response, source_context=source_context)
     assessment = FeasibilityAssessment(
