@@ -85,7 +85,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 
 ### Implementation for User Story 3
 
-- [ ] T024 [P] [US3] Implement evidence-reference formatting in `src/feasibility/reports.py`, including relative path, inclusive line range, excerpt, SHA-256 hash, evidence type, and relevance.
+- [X] T024 [P] [US3] Implement evidence-reference formatting in `src/feasibility/reports.py`, including relative path, inclusive line range, excerpt, SHA-256 hash, evidence type, and relevance.
 - [ ] T025 [P] [US3] Implement report sections for evaluated scope, assumptions, limitations, estimates, suggestions, risks, unresolved questions, and Developer review in `src/feasibility/reports.py`.
 - [ ] T026 [US3] Implement material-finding traceability checks in `src/feasibility/evidence.py`, requiring evidence, documented assumptions, or explicit limitations before a report can be completed.
 - [ ] T027 [US3] Implement read-only boundary checks in `src/feasibility/discovery.py` and `src/feasibility/workflow.py`, preventing report, database, cache, temporary, and metadata outputs from being placed under the analyzed root.

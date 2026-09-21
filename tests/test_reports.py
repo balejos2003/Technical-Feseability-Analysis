@@ -56,6 +56,41 @@ def test_render_report_contains_contract_headings_and_evidence():
     assert "### Finding f-1" in rendered
     assert "src/service.py lines 10-12" in rendered
     assert "sha256:abc123" in rendered
+    assert "Evidence type: code" in rendered
     assert "## Developer Review" in rendered
     assert "advisory" in rendered.lower()
     assert "no codebase change was applied" in rendered.lower()
+
+
+def test_render_report_labels_non_code_evidence_and_relevance():
+    evidence = EvidenceItem(
+        evidence_id="ev-assumption",
+        kind=EvidenceKind.ASSUMPTION,
+        description="The public API contract remains stable.",
+    )
+    finding = Finding(
+        finding_id="f-assumption",
+        category=FindingCategory.RISK,
+        statement="The assessment depends on the API contract remaining stable.",
+        basis="The requested change references that contract.",
+        evidence_ids=[evidence.evidence_id],
+    )
+    assessment = FeasibilityAssessment(
+        assessment_id="assess-assumption",
+        request_id="req-assumption",
+        principal_id="alice",
+        conclusion=FeasibilityConclusion.CONDITIONALLY_FEASIBLE,
+        evaluated_scope=["src/service.py"],
+        findings=[finding],
+        limitations=["The external contract was not inspected."],
+        report_markdown="placeholder",
+        analyzer_version="1.0.0",
+        evidence_items=[evidence],
+        status=AssessmentStatus.COMPLETED,
+    )
+
+    rendered = render_report(assessment)
+
+    assert "Evidence type: assumption" in rendered
+    assert "no source span available" in rendered
+    assert "Relevance: The public API contract remains stable." in rendered

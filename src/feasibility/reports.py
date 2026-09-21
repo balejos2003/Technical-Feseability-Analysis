@@ -28,10 +28,12 @@ def _render_evidence_lines(assessment: FeasibilityAssessment, finding: Finding) 
         if evidence.path and evidence.start_line is not None and evidence.end_line is not None:
             path_text = f"{evidence.path} lines {evidence.start_line}-{evidence.end_line}"
             lines.append(f"- Evidence: {path_text} (sha256:{evidence.file_hash})")
+            lines.append(f"  Evidence type: {evidence.kind.value}")
             if evidence.excerpt:
                 lines.append(f"  {evidence.excerpt}")
         else:
             lines.append(f"- Evidence: {evidence.kind.value} (no source span available)")
+            lines.append(f"  Evidence type: {evidence.kind.value}")
         lines.append(f"  Relevance: {evidence.description}")
 
     return lines
