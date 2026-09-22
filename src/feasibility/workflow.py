@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from .ai_analysis import invoke_analysis_provider, normalize_analysis_response
-from .config import application_paths
+from .config import application_paths, validate_application_paths_outside_repository
 from .context import SourceContext, prepare_source_context
 from .discovery import DiscoveryResult, discover_repository
 from .evidence import validate_assessment_traceability
@@ -179,6 +179,7 @@ def run_analysis_workflow(
         request_id=request_id,
         scope_rules=scope_rules,
     )
+    validate_application_paths_outside_repository(context.request.codebase_root)
     source_context = prepare_source_context(
         context.request.codebase_root,
         context.discovery,

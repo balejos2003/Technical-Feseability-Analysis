@@ -55,3 +55,17 @@ def ensure_output_outside_repository(output_path: Path | str, repository_root: P
     except ValueError:
         return output
     raise ValueError("Application outputs must be outside the analyzed repository")
+
+
+def validate_application_paths_outside_repository(repository_root: Path | str) -> ApplicationPaths:
+    """Reject application data directories that would place history or reports under the analyzed repository."""
+    paths = application_paths()
+    repository = Path(repository_root).expanduser().resolve()
+    for candidate in (paths.data_dir, paths.database_path, paths.reports_dir):
+        try:
+            ensure_output_outside_repository(candidate, repository)
+        except ValueError as exc:
+            raise ValueError(
+                f"Application outputs must be outside the analyzed repository: {candidate} is inside {repository}."
+            ) from exc
+    return paths

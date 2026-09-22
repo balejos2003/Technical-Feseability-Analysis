@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from feasibility.discovery import discover_repository
 
 
@@ -53,3 +55,14 @@ def test_discovery_skips_symlinks_when_not_followed(tmp_path):
 
     assert not any(item.relative_path == "link.txt" for item in result.files)
     assert any(issue.kind == "symlink_skipped" for issue in result.issues)
+
+
+def test_discovery_rejects_app_outputs_under_repository_root(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    bad_data_dir = repo / ".feasibility"
+
+    monkeypatch.setenv("FEASIBILITY_DATA_DIR", str(bad_data_dir))
+
+    with pytest.raises(ValueError, match="outside the analyzed repository"):
+        discover_repository(repo)

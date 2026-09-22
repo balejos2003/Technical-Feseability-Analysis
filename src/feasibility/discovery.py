@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .config import validate_application_paths_outside_repository
 from .models import ScopeRules
 
 
@@ -73,6 +74,8 @@ def discover_repository(
         raise FileNotFoundError(f"Repository root does not exist: {root}")
     if not root.is_dir():
         raise NotADirectoryError(f"Repository root is not a directory: {root}")
+
+    validate_application_paths_outside_repository(root)
 
     rules = _normalize_scope_rules(scope_rules)
     files: list[DiscoveredFile] = []
