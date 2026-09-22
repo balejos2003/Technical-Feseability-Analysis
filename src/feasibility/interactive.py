@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .ai_analysis import Provider, build_openai_provider
-from .config import application_paths, ensure_output_outside_repository
+from .config import application_paths, ensure_output_outside_repository, resolve_principal_id
 from .errors import FeasibilityError
 from .models import FeasibilityAssessment
 from .workflow import prepare_analysis_context, run_analysis_workflow
@@ -112,7 +112,7 @@ def prompt_analysis_request(
 
 def prepare_interactive_analysis(
     *,
-    principal_id: str,
+    principal_id: str | None = None,
     request_id: str | None = None,
     input_fn: InputFunction = input,
     output_fn: OutputFunction = print,
@@ -122,9 +122,10 @@ def prepare_interactive_analysis(
     """Collect analysis inputs and prepare their read-only discovery context."""
 
     request_input = request_input or prompt_analysis_request(input_fn=input_fn, output_fn=output_fn)
+    effective_principal = resolve_principal_id(principal_id)
     return prepare_analysis_context(
         request_input,
-        principal_id=principal_id,
+        principal_id=effective_principal,
         request_id=request_id,
         scope_rules=scope_rules,
     )
@@ -162,16 +163,17 @@ def run_analysis_interaction(
     *,
     input_fn: InputFunction = input,
     output_fn: OutputFunction = print,
-    principal_id: str = "local-developer",
+    principal_id: str | None = None,
     assessment: FeasibilityAssessment | None = None,
     provider: Provider | None = None,
 ) -> FeasibilityAssessment | None:
     """Run one interactive analysis and display its completed report."""
 
+    effective_principal = resolve_principal_id(principal_id)
     request_input = prompt_analysis_request(input_fn=input_fn, output_fn=output_fn)
 
     context = prepare_interactive_analysis(
-        principal_id=principal_id,
+        principal_id=effective_principal,
         input_fn=input_fn,
         output_fn=output_fn,
         request_input=request_input,
@@ -182,7 +184,7 @@ def run_analysis_interaction(
     try:
         completed_assessment = assessment or run_analysis_workflow(
             request_input,
-            principal_id=principal_id,
+            principal_id=effective_principal,
             provider=provider or build_openai_provider(),
         )
     except FeasibilityError as exc:
