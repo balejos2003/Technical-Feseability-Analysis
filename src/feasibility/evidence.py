@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from .models import EvidenceItem, EvidenceKind
+from .models import EvidenceItem, EvidenceKind, FeasibilityAssessment
 
 
 @dataclass(frozen=True)
@@ -90,4 +90,28 @@ def capture_evidence(
     )
 
 
-__all__ = ["EvidenceCapture", "capture_evidence"]
+def validate_assessment_traceability(assessment: FeasibilityAssessment) -> None:
+    """Ensure every material finding resolves to explicit supporting evidence."""
+
+    evidence_by_id = {item.evidence_id: item for item in assessment.evidence_items}
+    for finding in assessment.findings:
+        if not finding.evidence_ids:
+            raise ValueError(
+                f"Finding {finding.finding_id} has no evidence. "
+                "Add code, user-context, assumption, limitation, or conflict evidence."
+            )
+
+        missing_ids = [
+            evidence_id for evidence_id in finding.evidence_ids if evidence_id not in evidence_by_id
+        ]
+        if missing_ids:
+            missing = ", ".join(missing_ids)
+            raise ValueError(
+                f"Finding {finding.finding_id} references missing evidence: {missing}."
+            )
+
+        if not any(evidence_by_id[evidence_id].kind in EvidenceKind for evidence_id in finding.evidence_ids):
+            raise ValueError(f"Finding {finding.finding_id} has no valid evidence kind.")
+
+
+__all__ = ["EvidenceCapture", "capture_evidence", "validate_assessment_traceability"]

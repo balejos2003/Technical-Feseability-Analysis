@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .evidence import validate_assessment_traceability
 from .models import FeasibilityAssessment, FeasibilityConclusion, Finding, FindingCategory
 
 
@@ -42,6 +43,7 @@ def _render_evidence_lines(assessment: FeasibilityAssessment, finding: Finding) 
 def render_report(assessment: FeasibilityAssessment) -> str:
     """Render a traceable Markdown report for a completed assessment."""
 
+    validate_assessment_traceability(assessment)
     lines = [
         "# Technical Feasibility Assessment",
         "## Request",

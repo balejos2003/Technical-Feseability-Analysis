@@ -1,6 +1,17 @@
 from pathlib import Path
 
-from feasibility.evidence import EvidenceCapture, capture_evidence
+import pytest
+
+from feasibility.evidence import EvidenceCapture, capture_evidence, validate_assessment_traceability
+from feasibility.models import (
+    AssessmentStatus,
+    EvidenceItem,
+    EvidenceKind,
+    FeasibilityAssessment,
+    FeasibilityConclusion,
+    Finding,
+    FindingCategory,
+)
 
 
 def test_capture_evidence_uses_inclusive_ranges_and_hash(tmp_path):
@@ -46,3 +57,44 @@ def test_evidence_capture_rejects_missing_file(tmp_path):
         assert False, "Expected FileNotFoundError for missing file"
     except FileNotFoundError:
         pass
+
+
+def _assessment_with_finding(evidence_items, evidence_ids):
+    finding = Finding(
+        finding_id="finding-1",
+        category=FindingCategory.INTERPRETATION,
+        statement="The change has a defined integration point.",
+        basis="The supplied evidence identifies the integration point.",
+        evidence_ids=evidence_ids,
+    )
+    return FeasibilityAssessment(
+        assessment_id="assessment-1",
+        request_id="request-1",
+        principal_id="alice",
+        conclusion=FeasibilityConclusion.CONDITIONALLY_FEASIBLE,
+        evaluated_scope=["src/service.py"],
+        findings=[finding],
+        limitations=["Runtime behavior was not tested."],
+        report_markdown="placeholder",
+        analyzer_version="1.0.0",
+        evidence_items=evidence_items,
+        status=AssessmentStatus.COMPLETED,
+    )
+
+
+def test_traceability_rejects_missing_evidence_reference():
+    assessment = _assessment_with_finding([], ["missing-evidence"])
+
+    with pytest.raises(ValueError, match="references missing evidence"):
+        validate_assessment_traceability(assessment)
+
+
+def test_traceability_accepts_non_code_qualification_evidence():
+    evidence = EvidenceItem(
+        evidence_id="assumption-1",
+        kind=EvidenceKind.ASSUMPTION,
+        description="The existing API contract remains stable.",
+    )
+    assessment = _assessment_with_finding([evidence], [evidence.evidence_id])
+
+    validate_assessment_traceability(assessment)

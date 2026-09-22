@@ -12,6 +12,7 @@ from .ai_analysis import invoke_analysis_provider, normalize_analysis_response
 from .config import application_paths
 from .context import SourceContext, prepare_source_context
 from .discovery import DiscoveryResult, discover_repository
+from .evidence import validate_assessment_traceability
 from .errors import AIServiceUnavailableError
 from .models import (
     AnalysisRequest,
@@ -224,6 +225,7 @@ def run_analysis_workflow(
         suggestions=list(normalized.suggestions),
         unresolved_questions=list(normalized.unresolved_questions),
     )
+    validate_assessment_traceability(assessment)
     rendered_report = render_report(assessment)
     object.__setattr__(assessment, "report_markdown", rendered_report)
 
