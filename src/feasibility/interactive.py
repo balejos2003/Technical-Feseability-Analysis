@@ -65,6 +65,32 @@ def _prompt_save_preference(
         output_fn("Please answer yes or no.")
 
 
+def _prompt_review_acknowledgment(
+    input_fn: InputFunction,
+    output_fn: OutputFunction,
+) -> bool:
+    while True:
+        review_answer = input_fn("Have you reviewed this assessment and acknowledged it is advisory? ").strip().lower()
+        if review_answer in {"yes", "y", "sim", "s"}:
+            return True
+        if review_answer in {"no", "n", "nao", "não"}:
+            return False
+        output_fn("Please answer yes or no.")
+
+
+def _prompt_result_retention(
+    input_fn: InputFunction,
+    output_fn: OutputFunction,
+) -> bool:
+    while True:
+        retain_answer = input_fn("Do you want to retain this result for future reference? ").strip().lower()
+        if retain_answer in {"yes", "y", "sim", "s"}:
+            return True
+        if retain_answer in {"no", "n", "nao", "não"}:
+            return False
+        output_fn("Please answer yes or no.")
+
+
 def prompt_analysis_request(
     *,
     input_fn: InputFunction = input,
@@ -167,12 +193,25 @@ def run_analysis_interaction(
         return None
 
     display_report(completed_assessment, output_fn=output_fn)
+
+    reviewed = _prompt_review_acknowledgment(input_fn=input_fn, output_fn=output_fn)
+    if not reviewed:
+        output_fn("You reviewed this assessment and chose to delay the final retention decision.")
+        return completed_assessment
+
+    output_fn("You reviewed this assessment and acknowledged that it is advisory.")
+    retain_result = _prompt_result_retention(input_fn=input_fn, output_fn=output_fn)
+    if not retain_result:
+        output_fn("You reviewed this assessment and chose not to retain it for future reference.")
+        return completed_assessment
+
     if context.save_report:
         report_path = save_external_report(
             completed_assessment,
             repository_root=context.request.codebase_root,
         )
         output_fn(f"Report copy saved to: {report_path}")
+    output_fn("You reviewed this assessment and retained it for future reference.")
     return completed_assessment
 
 

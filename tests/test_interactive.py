@@ -158,7 +158,7 @@ def test_menu_option_one_runs_provider_and_displays_completed_report(tmp_path):
     source_text = "def calculate():\n    return 1\n"
     (tmp_path / "module.py").write_text(source_text, encoding="utf-8")
     file_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
-    inputs = iter(["1", str(tmp_path), "Add parentheses", "", "no", "3"])
+    inputs = iter(["1", str(tmp_path), "Add parentheses", "", "no", "yes", "yes", "3"])
 
     def provider(prompt):
         return {
@@ -199,6 +199,7 @@ def test_menu_option_one_runs_provider_and_displays_completed_report(tmp_path):
 
     assert any("# Technical Feasibility Assessment" in message for message in output)
     assert any("## Developer Review" in message for message in output)
+    assert any("reviewed this assessment" in message.lower() for message in output)
 
 
 def test_openai_provider_requires_api_key(monkeypatch):
