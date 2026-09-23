@@ -9,6 +9,7 @@ from typing import Any
 from .ai_analysis import Provider, build_openai_provider
 from .config import application_paths, ensure_output_outside_repository, resolve_principal_id
 from .errors import FeasibilityError
+from .history import get_history_detail, list_history, search_history
 from .models import FeasibilityAssessment
 from .workflow import prepare_analysis_context, run_analysis_workflow
 
@@ -217,6 +218,80 @@ def run_analysis_interaction(
     return completed_assessment
 
 
+def _print_history_entries(
+    entries: list[Any],
+    *,
+    output_fn: OutputFunction,
+) -> None:
+    if not entries:
+        output_fn("No matching analyses found.")
+        return
+
+    for entry in entries:
+        output_fn(
+            f"{entry.assessment_id} | {entry.created_at.isoformat()} | "
+            f"{entry.summary} | {entry.conclusion}"
+        )
+
+
+def run_history_menu(
+    *,
+    input_fn: InputFunction = input,
+    output_fn: OutputFunction = print,
+    principal_id: str | None = None,
+    database_path: str | None = None,
+) -> None:
+    """Run the history submenu for listing, searching, and reopening previous assessments."""
+
+    effective_principal = resolve_principal_id(principal_id)
+    history_menu = (
+        "1. List recent analyses",
+        "2. Search analyses",
+        "3. Open an analysis by identifier",
+        "4. Return to main menu",
+    )
+
+    while True:
+        for option in history_menu:
+            output_fn(option)
+
+        try:
+            choice = input_fn("Select an option: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            output_fn("Session ended.")
+            return
+
+        if choice == "1":
+            entries = list_history(effective_principal, database_path=database_path)
+            if not entries:
+                output_fn("No analyses found for this principal.")
+            else:
+                _print_history_entries(entries, output_fn=output_fn)
+        elif choice == "2":
+            query = input_fn("Search term: ").strip()
+            entries = search_history(effective_principal, query, database_path=database_path)
+            if not entries:
+                output_fn("No matching analyses found.")
+            else:
+                _print_history_entries(entries, output_fn=output_fn)
+        elif choice == "3":
+            assessment_id = input_fn("Assessment identifier: ").strip()
+            if not assessment_id:
+                output_fn("No analysis found for that identifier.")
+                continue
+
+            detail = get_history_detail(assessment_id, effective_principal, database_path=database_path)
+            if detail is None:
+                output_fn("No analysis found for that identifier.")
+                continue
+
+            output_fn(detail.markdown_report)
+        elif choice == "4":
+            return
+        else:
+            output_fn("Invalid history menu choice. Please select 1, 2, 3, or 4.")
+
+
 def run_interactive_session(
     *,
     input_fn: InputFunction = input,
@@ -237,6 +312,11 @@ def run_interactive_session(
             output_fn=output_fn,
             provider=provider,
         )
+    if history_action is None:
+        history_action = lambda: run_history_menu(
+            input_fn=input_fn,
+            output_fn=output_fn,
+        )
 
     while True:
         for option in _MENU_OPTIONS:
@@ -256,8 +336,7 @@ def run_interactive_session(
                 return
         elif choice == "2":
             try:
-                if history_action is not None:
-                    history_action()
+                history_action()
             except (EOFError, KeyboardInterrupt):
                 output_fn("Session ended.")
                 return
@@ -272,6 +351,7 @@ __all__ = [
     "prepare_interactive_analysis",
     "prompt_analysis_request",
     "run_analysis_interaction",
+    "run_history_menu",
     "run_interactive_session",
     "save_external_report",
 ]

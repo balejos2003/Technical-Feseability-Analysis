@@ -1,4 +1,6 @@
 import hashlib
+import json
+import sqlite3
 
 import pytest
 
@@ -7,6 +9,7 @@ from feasibility.errors import AIServiceUnavailableError
 from feasibility.interactive import (
     display_report,
     prompt_analysis_request,
+    run_history_menu,
     save_external_report,
     run_interactive_session,
 )
@@ -18,7 +21,140 @@ from feasibility.models import (
     FindingCategory,
     ScopeRules,
 )
+from feasibility.storage import initialize_schema
 from feasibility.workflow import prepare_analysis_context, run_analysis_workflow
+
+
+def _seed_history_for_menu(db_path):
+    initialize_schema(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO request (request_id, principal_id, codebase_root, change_description, scope_rules, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "req-menu",
+                "alice",
+                "/tmp/repo",
+                "Add a new API client to the service layer.",
+                json.dumps({"excluded_dirs": ["node_modules"]}),
+                "2026-09-19T10:00:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO assessment (
+                assessment_id,
+                request_id,
+                principal_id,
+                conclusion,
+                evaluated_scope,
+                findings,
+                limitations,
+                report_markdown,
+                analyzer_version,
+                created_at,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "assess-menu",
+                "req-menu",
+                "alice",
+                "conditionally_feasible",
+                json.dumps(["src/service.py"]),
+                json.dumps([
+                    {
+                        "finding_id": "f-menu",
+                        "category": "interpretation",
+                        "statement": "The service layer can be extended cleanly.",
+                        "basis": "The requested change fits the current adapter pattern.",
+                        "uncertainty": "Low",
+                        "severity": "medium",
+                        "evidence_ids": ["ev-menu"],
+                    }
+                ]),
+                json.dumps(["Runtime verification remains pending."]),
+                "# Report\n\nThe service layer can be extended cleanly.",
+                "1.0.0",
+                "2026-09-19T10:05:00+00:00",
+                "completed",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO evidence (
+                evidence_id,
+                assessment_id,
+                kind,
+                path,
+                start_line,
+                end_line,
+                excerpt,
+                file_hash,
+                description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "ev-menu",
+                "assess-menu",
+                "code",
+                "src/service.py",
+                12,
+                18,
+                "adapter = ClientAdapter()",
+                "abc123",
+                "The service layer already uses an adapter pattern that matches the proposed extension.",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO finding (
+                finding_id,
+                assessment_id,
+                category,
+                severity,
+                statement,
+                basis,
+                uncertainty
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "f-menu",
+                "assess-menu",
+                "interpretation",
+                "medium",
+                "The service layer can be extended cleanly.",
+                "The requested change fits the current adapter pattern.",
+                "Low",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO finding_evidence (finding_id, evidence_id) VALUES (?, ?)
+            """,
+            ("f-menu", "ev-menu"),
+        )
+
+
+def test_history_menu_supports_list_search_and_open(tmp_path):
+    db_path = tmp_path / "history.sqlite3"
+    _seed_history_for_menu(db_path)
+
+    inputs = iter(["1", "2", "service", "3", "assess-menu", "4"])
+    output = []
+
+    run_history_menu(
+        input_fn=lambda _: next(inputs),
+        output_fn=output.append,
+        principal_id="alice",
+        database_path=str(db_path),
+    )
+
+    assert any("assess-menu" in message for message in output)
+    assert any("No matching analyses found." in message for message in output) is False
+    assert any("The service layer can be extended cleanly." in message for message in output)
 
 
 def test_session_exits_from_main_menu():
