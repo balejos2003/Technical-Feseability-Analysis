@@ -80,6 +80,60 @@ def _seed_history(db_path):
         )
         conn.execute(
             """
+            INSERT INTO evidence (
+                evidence_id,
+                assessment_id,
+                kind,
+                path,
+                start_line,
+                end_line,
+                excerpt,
+                file_hash,
+                description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "ev-1",
+                "assess-1",
+                "code",
+                "src/service.py",
+                12,
+                18,
+                "adapter = ClientAdapter()",
+                "abc123",
+                "The service layer already uses an adapter pattern that matches the proposed extension.",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO finding (
+                finding_id,
+                assessment_id,
+                category,
+                severity,
+                statement,
+                basis,
+                uncertainty
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "f-1",
+                "assess-1",
+                "interpretation",
+                "medium",
+                "The service layer can be extended cleanly.",
+                "The requested change fits the current adapter pattern.",
+                "Low",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO finding_evidence (finding_id, evidence_id) VALUES (?, ?)
+            """,
+            ("f-1", "ev-1"),
+        )
+        conn.execute(
+            """
             INSERT INTO assessment (
                 assessment_id,
                 request_id,
@@ -179,4 +233,8 @@ def test_get_history_detail_requires_authorized_principal(tmp_path):
     detail = get_history_detail("assess-1", "alice", database_path=db_path)
     assert detail is not None
     assert detail.assessment.assessment_id == "assess-1"
+    assert detail.markdown_report == "# Report\n\nThe service layer can be extended cleanly."
+    assert detail.assessment.findings[0].statement == "The service layer can be extended cleanly."
+    assert detail.assessment.evidence_items[0].evidence_id == "ev-1"
+    assert detail.assessment.evidence_items[0].path == "src/service.py"
     assert get_history_detail("assess-1", "bob", database_path=db_path) is None

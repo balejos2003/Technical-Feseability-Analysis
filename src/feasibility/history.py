@@ -8,11 +8,15 @@ from typing import Any
 
 from .models import (
     AssessmentStatus,
+    EvidenceItem,
+    EvidenceKind,
     FeasibilityAssessment,
     FeasibilityConclusion,
     Finding,
+    FindingCategory,
     HistoryDetail,
     HistoryListEntry,
+    Severity,
 )
 from .storage import get_connection
 
@@ -115,6 +119,27 @@ def search_history(
     return [_row_to_history_entry(row) for row in rows]
 
 
+def _parse_evidence_items(value: Any) -> list[EvidenceItem]:
+    payload = value if isinstance(value, list) else json.loads(value or "[]")
+    items: list[EvidenceItem] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        items.append(
+            EvidenceItem(
+                evidence_id=str(item.get("evidence_id") or "evidence"),
+                kind=item.get("kind", EvidenceKind.CODE),
+                description=str(item.get("description") or ""),
+                path=item.get("path"),
+                start_line=item.get("start_line"),
+                end_line=item.get("end_line"),
+                excerpt=item.get("excerpt"),
+                file_hash=item.get("file_hash"),
+            )
+        )
+    return items
+
+
 def get_history_detail(
     assessment_id: str,
     principal_id: str,
@@ -137,16 +162,80 @@ def get_history_detail(
         if row is None:
             return None
 
+        evidence_rows = conn.execute(
+            """
+            SELECT *
+            FROM evidence
+            WHERE assessment_id = ?
+            ORDER BY path, start_line, evidence_id
+            """,
+            (row["assessment_id"],),
+        ).fetchall()
+
+        parsed_evidence = [
+            EvidenceItem(
+                evidence_id=row_value["evidence_id"],
+                kind=EvidenceKind(row_value["kind"]),
+                description=row_value["description"],
+                path=row_value["path"],
+                start_line=row_value["start_line"],
+                end_line=row_value["end_line"],
+                excerpt=row_value["excerpt"],
+                file_hash=row_value["file_hash"],
+            )
+            for row_value in evidence_rows
+        ]
+
+        finding_rows = conn.execute(
+            """
+            SELECT *
+            FROM finding
+            WHERE assessment_id = ?
+            ORDER BY finding_id
+            """,
+            (row["assessment_id"],),
+        ).fetchall()
+
+        findings: list[Finding] = []
+        for finding_row in finding_rows:
+            evidence_ids = [
+                item["evidence_id"]
+                for item in conn.execute(
+                    """
+                    SELECT evidence_id
+                    FROM finding_evidence
+                    WHERE finding_id = ?
+                    ORDER BY evidence_id
+                    """,
+                    (finding_row["finding_id"],),
+                ).fetchall()
+            ]
+            findings.append(
+                Finding(
+                    finding_id=finding_row["finding_id"],
+                    category=FindingCategory(finding_row["category"]),
+                    statement=finding_row["statement"],
+                    basis=finding_row["basis"],
+                    uncertainty=finding_row["uncertainty"],
+                    severity=Severity(finding_row["severity"]) if finding_row["severity"] else None,
+                    evidence_ids=evidence_ids,
+                )
+            )
+
+        if not findings:
+            findings = _parse_findings(row["findings"])
+
         refined_assessment = FeasibilityAssessment(
             assessment_id=row["assessment_id"],
             request_id=row["request_id"],
             principal_id=row["principal_id"],
             conclusion=FeasibilityConclusion(row["conclusion"]),
             evaluated_scope=json.loads(row["evaluated_scope"] or "[]"),
-            findings=_parse_findings(row["findings"]),
+            findings=findings,
             limitations=json.loads(row["limitations"] or "[]"),
             report_markdown=row["report_markdown"],
             analyzer_version=row["analyzer_version"],
+            evidence_items=parsed_evidence,
             created_at=_parse_datetime(row["created_at"]),
             status=AssessmentStatus.COMPLETED,
         )
