@@ -11,6 +11,8 @@ from typing import Any
 from .models import AnalysisRequest, FeasibilityAssessment
 from .config import application_paths
 
+SCHEMA_VERSION = 2
+
 
 def ensure_database(database_path: str | Path) -> Path:
     """Ensure the parent directories and SQLite database file exist."""
@@ -80,13 +82,42 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
             FOREIGN KEY (finding_id) REFERENCES finding(finding_id),
             FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id)
         );
-
-        CREATE INDEX IF NOT EXISTS idx_request_principal ON request(principal_id, created_at);
-        CREATE INDEX IF NOT EXISTS idx_assessment_principal ON assessment(principal_id, created_at);
-        CREATE INDEX IF NOT EXISTS idx_assessment_conclusion ON assessment(conclusion);
-        CREATE INDEX IF NOT EXISTS idx_assessment_request ON assessment(request_id);
         """
     )
+    _migrate_schema(conn)
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Apply idempotent schema migrations while preserving existing history."""
+
+    current_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if current_version > SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Database schema version {current_version} is newer than supported version {SCHEMA_VERSION}."
+        )
+
+    if current_version < 1:
+        conn.execute("PRAGMA user_version = 1")
+        current_version = 1
+
+    if current_version < 2:
+        conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_request_principal_created
+                ON request(principal_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_request_change_description
+                ON request(LOWER(change_description));
+            CREATE INDEX IF NOT EXISTS idx_assessment_principal_status_created
+                ON assessment(principal_id, status, created_at);
+            CREATE INDEX IF NOT EXISTS idx_assessment_conclusion_status
+                ON assessment(conclusion, status);
+            CREATE INDEX IF NOT EXISTS idx_assessment_evaluated_scope
+                ON assessment(LOWER(evaluated_scope));
+            CREATE INDEX IF NOT EXISTS idx_assessment_request
+                ON assessment(request_id);
+            PRAGMA user_version = 2;
+            """
+        )
 
 
 def get_connection(database_path: str | Path | None = None) -> sqlite3.Connection:
@@ -458,6 +489,7 @@ def save_analysis_record(
 
 
 __all__ = [
+    "SCHEMA_VERSION",
     "ensure_database",
     "get_connection",
     "initialize_schema",

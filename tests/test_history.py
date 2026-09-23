@@ -2,7 +2,7 @@ import json
 import sqlite3
 
 from feasibility.history import get_history_detail, list_history, search_history
-from feasibility.storage import initialize_schema
+from feasibility.storage import SCHEMA_VERSION, initialize_schema
 
 
 def _seed_history(db_path):
@@ -238,6 +238,36 @@ def test_get_history_detail_requires_authorized_principal(tmp_path):
     assert detail.assessment.evidence_items[0].evidence_id == "ev-1"
     assert detail.assessment.evidence_items[0].path == "src/service.py"
     assert get_history_detail("assess-1", "bob", database_path=db_path) is None
+
+
+def test_initialize_schema_migrates_legacy_database_and_adds_history_indexes(tmp_path):
+    db_path = tmp_path / "legacy.sqlite3"
+    initialize_schema(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA user_version = 1")
+        conn.execute("DROP INDEX idx_assessment_principal_status_created")
+
+    initialize_schema(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        indexes = {
+            row[1]
+            for row in conn.execute("PRAGMA index_list('assessment')").fetchall()
+        }
+        request_indexes = {
+            row[1]
+            for row in conn.execute("PRAGMA index_list('request')").fetchall()
+        }
+
+    assert version == SCHEMA_VERSION
+    assert "idx_assessment_principal_status_created" in indexes
+    assert "idx_assessment_conclusion_status" in indexes
+    assert "idx_assessment_evaluated_scope" in indexes
+    assert "idx_assessment_request" in indexes
+    assert "idx_request_principal_created" in request_indexes
+    assert "idx_request_change_description" in request_indexes
 
 
 def test_get_history_detail_returns_same_unavailable_semantics_for_missing_and_foreign_records(tmp_path):
