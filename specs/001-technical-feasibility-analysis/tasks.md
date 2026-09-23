@@ -107,7 +107,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T030 [US4] Implement history list and search queries in `src/feasibility/history.py`, returning only completed assessments owned by the current principal and showing date, summary, and conclusion.
 - [X] T031 [US4] Implement history detail retrieval in `src/feasibility/history.py`, returning the immutable structured assessment and original Markdown report for an authorized identifier.
 - [X] T032 [US4] Implement the interactive history submenu in `src/feasibility/interactive.py`, supporting list, search, open-by-identifier, return-to-menu, and no-match behavior.
-- [ ] T033 [US4] Implement unauthorized and missing-record semantics in `src/feasibility/history.py` and `src/feasibility/interactive.py`, presenting both cases as unavailable without leaking another principal's records.
+- [X] T033 [US4] Implement unauthorized and missing-record semantics in `src/feasibility/history.py` and `src/feasibility/interactive.py`, presenting both cases as unavailable without leaking another principal's records.
 - [ ] T034 [US4] Add history schema indexes and migration version handling in `src/feasibility/storage.py` for principal, date, conclusion, and searchable request context.
 
 **Checkpoint**: Historical analyses are easy to find and reopen, remain unchanged, and are isolated by principal.

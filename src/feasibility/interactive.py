@@ -18,6 +18,8 @@ InputFunction = Callable[[str], str]
 OutputFunction = Callable[[str], Any]
 ActionFunction = Callable[[], Any]
 
+_HISTORY_UNAVAILABLE_MESSAGE = "Analysis unavailable."
+
 AnalysisInput = dict[str, str | bool]
 
 _MENU_OPTIONS = (
@@ -277,12 +279,12 @@ def run_history_menu(
         elif choice == "3":
             assessment_id = input_fn("Assessment identifier: ").strip()
             if not assessment_id:
-                output_fn("No analysis found for that identifier.")
+                output_fn(_HISTORY_UNAVAILABLE_MESSAGE)
                 continue
 
             detail = get_history_detail(assessment_id, effective_principal, database_path=database_path)
             if detail is None:
-                output_fn("No analysis found for that identifier.")
+                output_fn(_HISTORY_UNAVAILABLE_MESSAGE)
                 continue
 
             output_fn(detail.markdown_report)

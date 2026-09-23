@@ -157,6 +157,23 @@ def test_history_menu_supports_list_search_and_open(tmp_path):
     assert any("The service layer can be extended cleanly." in message for message in output)
 
 
+def test_history_menu_does_not_distinguish_missing_and_foreign_records(tmp_path):
+    db_path = tmp_path / "history.sqlite3"
+    _seed_history_for_menu(db_path)
+    inputs = iter(["3", "assess-menu", "3", "missing", "4"])
+    output = []
+
+    run_history_menu(
+        input_fn=lambda _: next(inputs),
+        output_fn=output.append,
+        principal_id="bob",
+        database_path=str(db_path),
+    )
+
+    assert output.count("Analysis unavailable.") == 2
+    assert all("service layer" not in message for message in output)
+
+
 def test_session_exits_from_main_menu():
     inputs = iter(["3"])
     output = []

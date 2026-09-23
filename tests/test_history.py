@@ -238,3 +238,13 @@ def test_get_history_detail_requires_authorized_principal(tmp_path):
     assert detail.assessment.evidence_items[0].evidence_id == "ev-1"
     assert detail.assessment.evidence_items[0].path == "src/service.py"
     assert get_history_detail("assess-1", "bob", database_path=db_path) is None
+
+
+def test_get_history_detail_returns_same_unavailable_semantics_for_missing_and_foreign_records(tmp_path):
+    db_path = tmp_path / "history.sqlite3"
+    _seed_history(db_path)
+
+    assert get_history_detail("does-not-exist", "alice", database_path=db_path) is None
+    assert get_history_detail("assess-1", "bob", database_path=db_path) is None
+    assert get_history_detail("", "alice", database_path=db_path) is None
+    assert get_history_detail("assess-1", "", database_path=db_path) is None

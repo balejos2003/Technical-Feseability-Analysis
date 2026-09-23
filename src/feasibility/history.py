@@ -146,7 +146,10 @@ def get_history_detail(
     *,
     database_path: str | None = None,
 ) -> HistoryDetail | None:
-    """Return a full immutable assessment for an authorized principal."""
+    """Return an authorized assessment or ``None`` without exposing access state."""
+
+    if not (assessment_id or "").strip() or not (principal_id or "").strip():
+        return None
 
     with get_connection(database_path) as conn:
         row = conn.execute(
