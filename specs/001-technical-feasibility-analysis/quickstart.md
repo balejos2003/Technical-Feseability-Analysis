@@ -111,6 +111,10 @@ virtual environment:
   any fixture file; the mixed fixture contained 7 discovered files and a 1,260-character
   context. The 2-second startup, 5-minute completion, and 10,000-record lookup targets
   were not benchmarked in this run and remain open for T040.
+- **T038 read-only verification**: a complete workflow run with a deterministic provider
+  and external report saving left the copied fixture tree byte-for-byte and structurally
+  unchanged. The SQLite database and Markdown report were created only in the configured
+  external application-data directory.
 
 The quickstart examples use `tests/fixtures/mixed-repo` and
 `tests/fixtures/unsupported-repo` in this repository. A real AI-backed run additionally
