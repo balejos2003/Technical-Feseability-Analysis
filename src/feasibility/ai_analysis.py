@@ -31,6 +31,37 @@ def _normalize_enum_value(value: Any) -> Any:
     return value.strip().lower().replace(" ", "_") if isinstance(value, str) else value
 
 
+def _normalize_severity(value: Any) -> Any:
+    """Map provider severity aliases to the supported impact levels."""
+
+    normalized = _normalize_enum_value(value)
+    if normalized in {"critical", "severe"}:
+        return Severity.HIGH.value
+    return normalized
+
+
+def _normalize_estimates(value: Any) -> tuple[list[dict[str, str]], list[str]]:
+    """Keep complete estimates and report incomplete entries as limitations."""
+
+    if not isinstance(value, list):
+        raise ValueError("estimates must be a list")
+
+    estimates: list[dict[str, str]] = []
+    limitations: list[str] = []
+    for index, estimate in enumerate(value, start=1):
+        if not isinstance(estimate, dict):
+            limitations.append(f"Estimate {index} was omitted because it was not a mapping.")
+            continue
+        if not estimate.get("label") or not estimate.get("value") or not estimate.get("basis"):
+            limitations.append(
+                f"Estimate {index} was omitted because its label, value, or basis was missing."
+            )
+            continue
+        estimates.append(dict(estimate))
+
+    return estimates, limitations
+
+
 def build_openai_provider(
     *,
     api_key: str | None = None,
@@ -160,14 +191,17 @@ def build_analysis_prompt(
         "for every material finding.\n\n"
         "Required output contract:\n"
         "- conclusion: feasible | infeasible | conditionally_feasible\n"
-        "- findings: list of material findings with category, statement, basis, uncertainty, severity, and evidence\n"
+        "- findings: list of material findings with category, statement, basis, uncertainty, severity (low | medium | high), and evidence\n"
         "- limitations: list of missing, stale, or ambiguous evidence\n"
         "- assumptions: list of explicit assumptions used during assessment\n"
-        "- estimates: list of labeled estimates with value, basis, and uncertainty\n"
+        "- estimates: list of labeled estimates with value, basis, and uncertainty; estimates: [] is valid\n"
+        "If an estimate lacks label, value, or basis, omit only that estimate and record the omission as a limitation.\n"
         "- suggestions: list of actionable suggestions\n"
         "- unresolved_questions: list of open questions\n\n"
         "Evidence rule: every finding must include at least one evidence object.\n"
         "Use only files, line ranges, excerpts, and hashes present in the supplied context.\n"
+        "Do not cite excluded, truncated, undiscovered, or implied files; if a relevant file is not present,\n"
+        "record that limitation instead of guessing its contents.\n"
         "If a claim cannot be supported by the supplied context, do not create a finding;\n"
         "record it as a limitation, assumption, or unresolved question instead.\n"
         "Example finding shape:\n"
@@ -250,7 +284,7 @@ def _to_finding(item: dict[str, Any], *, index: int | None = None) -> Finding:
         statement=str(item.get("statement") or ""),
         basis=str(item.get("basis") or ""),
         uncertainty=item.get("uncertainty"),
-        severity=_normalize_enum_value(item.get("severity")),
+        severity=_normalize_severity(item.get("severity")),
         evidence_ids=evidence_ids,
     )
 
@@ -310,14 +344,8 @@ def normalize_analysis_response(
     if not isinstance(assumptions, list):
         raise ValueError("assumptions must be a list")
 
-    estimates = payload.get("estimates") or []
-    if not isinstance(estimates, list):
-        raise ValueError("estimates must be a list")
-    for estimate in estimates:
-        if not isinstance(estimate, dict):
-            raise ValueError("Each estimate must be a mapping")
-        if not estimate.get("label") or not estimate.get("value") or not estimate.get("basis"):
-            raise ValueError("Each estimate requires label, value, and basis")
+    estimates, estimate_limitations = _normalize_estimates(payload.get("estimates") or [])
+    limitations.extend(estimate_limitations)
 
     suggestions = payload.get("suggestions") or []
     if not isinstance(suggestions, list):
@@ -332,7 +360,7 @@ def normalize_analysis_response(
         findings=normalized_findings,
         limits=list(limitations),
         assumptions=list(assumptions),
-        estimates=[dict(estimate) for estimate in estimates],
+        estimates=estimates,
         suggestions=list(suggestions),
         unresolved_questions=list(unresolved_questions),
     )

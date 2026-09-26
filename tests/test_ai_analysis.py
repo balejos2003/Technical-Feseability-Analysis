@@ -97,6 +97,30 @@ def test_normalize_analysis_response_accepts_case_variations_from_provider():
     assert result.findings[0].severity.value == "high"
 
 
+def test_normalize_analysis_response_maps_critical_severity_to_high():
+    payload = {
+        "conclusion": "feasible",
+        "findings": [
+            {
+                "id": "f-critical",
+                "category": "risk",
+                "statement": "The change may affect a critical path.",
+                "basis": "The supplied source shows a shared execution path.",
+                "severity": "critical",
+                "evidence": [{"id": "ev-critical", "kind": "assumption"}],
+            }
+        ],
+        "limitations": ["Runtime behavior was not tested."],
+        "assumptions": [],
+        "estimates": [],
+        "suggestions": [],
+    }
+
+    result = normalize_analysis_response(payload)
+
+    assert result.findings[0].severity.value == "high"
+
+
 def test_normalize_analysis_response_rejects_missing_evidence():
     payload = {
         "conclusion": "feasible",
@@ -190,11 +214,57 @@ def test_normalize_rejects_estimate_without_label():
         "suggestions": [],
     }
 
-    try:
-        normalize_analysis_response(payload)
-        assert False, "Expected ValueError for unlabeled estimate"
-    except ValueError as exc:
-        assert "label" in str(exc)
+    result = normalize_analysis_response(payload)
+
+    assert result.estimates == []
+    assert result.limits[-1] == (
+        "Estimate 1 was omitted because its label, value, or basis was missing."
+    )
+
+
+def test_normalize_estimates_preserves_valid_entries_and_omits_invalid_entries():
+    payload = {
+        "conclusion": "conditionally_feasible",
+        "findings": [
+            {
+                "id": "f-estimates",
+                "category": "interpretation",
+                "statement": "The change is bounded.",
+                "basis": "The supplied source shows one affected module.",
+                "evidence": [{"id": "ev-estimates", "kind": "assumption"}],
+            }
+        ],
+        "limitations": [],
+        "assumptions": [],
+        "estimates": [
+            {"label": "Effort", "value": "2 days", "basis": "One module."},
+            {"label": "Confidence", "value": "medium"},
+            {"label": "Risk window", "value": "1 week", "basis": "One integration point."},
+        ],
+        "suggestions": [],
+    }
+
+    result = normalize_analysis_response(payload)
+
+    assert result.estimates == [
+        {"label": "Effort", "value": "2 days", "basis": "One module."},
+        {"label": "Risk window", "value": "1 week", "basis": "One integration point."},
+    ]
+    assert result.limits == [
+        "Estimate 2 was omitted because its label, value, or basis was missing."
+    ]
+
+
+def test_prompt_declares_empty_estimates_and_omission_behavior():
+    prompt = build_analysis_prompt(
+        repository_root="/tmp/repo",
+        change_description="Update the service",
+        scope_summary="one file inspected",
+        context="File: src/service.py lines 1-2\nreturn 1",
+    )
+
+    assert "estimates: [] is valid" in prompt
+    assert "omit only that estimate" in prompt
 
 
 def test_normalize_rejects_evidence_outside_supplied_context(tmp_path):
@@ -233,3 +303,14 @@ def test_normalize_rejects_evidence_outside_supplied_context(tmp_path):
         assert False, "Expected ValueError for evidence outside context"
     except ValueError as exc:
         assert "context" in str(exc)
+
+
+def test_prompt_forbids_evidence_from_truncated_or_excluded_files():
+    prompt = build_analysis_prompt(
+        repository_root="/tmp/repo",
+        change_description="Update the service",
+        scope_summary="one file included, one file truncated",
+        context="File: src/service.py lines 1-2\nreturn 1",
+    )
+
+    assert "Do not cite excluded, truncated, undiscovered, or implied files" in prompt

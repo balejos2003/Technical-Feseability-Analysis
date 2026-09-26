@@ -109,6 +109,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T032 [US4] Implement the interactive history submenu in `src/feasibility/interactive.py`, supporting list, search, open-by-identifier, return-to-menu, and no-match behavior.
 - [X] T033 [US4] Implement unauthorized and missing-record semantics in `src/feasibility/history.py` and `src/feasibility/interactive.py`, presenting both cases as unavailable without leaking another principal's records.
 - [X] T034 [US4] Add history schema indexes and migration version handling in `src/feasibility/storage.py` for principal, date, conclusion, and searchable request context.
+- [X] T042 [US2] Make estimate validation independent in `src/feasibility/ai_analysis.py`, omitting incomplete estimates, recording transparent limitations, and covering the behavior in the AI analysis tests and report contract.
 
 **Checkpoint**: Historical analyses are easy to find and reopen, remain unchanged, and are isolated by principal.
 

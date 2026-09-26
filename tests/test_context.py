@@ -56,3 +56,20 @@ def test_context_keeps_discovery_issues_visible(tmp_path):
     assert context.items == ()
     assert len(context.issues) == 1
     assert "data.bin" in context.as_text()
+
+
+def test_context_includes_constitution_without_special_priority(tmp_path):
+    constitution = tmp_path / ".specify" / "memory" / "constitution.md"
+    constitution.parent.mkdir(parents=True)
+    constitution.write_text("# Constitution\n\nProtect the codebase.\n", encoding="utf-8")
+    source_file = tmp_path / "source.py"
+    source_file.write_text("value = 1\n", encoding="utf-8")
+
+    discovery = discover_repository(tmp_path)
+    context = prepare_source_context(tmp_path, discovery, max_context_chars=1_000)
+
+    assert [item.path for item in context.items] == [
+        ".specify/memory/constitution.md",
+        "source.py",
+    ]
+    assert "Constitution" in context.items[0].excerpt

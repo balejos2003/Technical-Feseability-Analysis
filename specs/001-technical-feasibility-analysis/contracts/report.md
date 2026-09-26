@@ -32,5 +32,7 @@ For non-code evidence, the reference MUST identify the source as `user_context`,
 
 The Conclusion section MUST use exactly one of `Feasible`, `Infeasible`, or
 `Conditionally feasible`. Estimates and suggestions MUST be labeled and MUST include
-basis and uncertainty when available. The Developer Review section MUST state that the
-result is advisory and that no codebase change was applied by the analysis.
+basis and uncertainty when available. An incomplete estimate MUST be omitted and the
+omission MUST be recorded as a limitation; an empty estimates section is valid. The
+Developer Review section MUST state that the result is advisory and that no codebase
+change was applied by the analysis.
