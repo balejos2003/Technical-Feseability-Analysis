@@ -1,0 +1,2 @@
+unsupported = true
+payload = "This text is intentionally outside the allowed extension scope."

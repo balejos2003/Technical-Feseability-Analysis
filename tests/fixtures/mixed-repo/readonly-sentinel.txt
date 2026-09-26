@@ -1,0 +1,1 @@
+This sentinel must remain unchanged after analysis.
