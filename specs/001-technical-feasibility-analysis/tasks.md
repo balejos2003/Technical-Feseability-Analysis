@@ -119,7 +119,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 
 **Purpose**: Validate the complete feature, document operational boundaries, and improve maintainability.
 
-- [ ] T035 [P] Update `README.md` with the final interactive workflow, external data locations, supported input limitations, and evidence-report format.
+- [X] T035 [P] Update `README.md` with the final interactive workflow, external data locations, supported input limitations, and evidence-report format.
 - [ ] T036 [P] Add fixture repositories under `tests/fixtures/` for mixed readable files, unreadable or unsupported files, syntax-like ambiguity, exclusions, and read-only verification.
 - [ ] T037 Run the scenarios in `specs/001-technical-feasibility-analysis/quickstart.md` against the implemented script and record any contract deviations in `specs/001-technical-feasibility-analysis/quickstart.md`.
 - [ ] T038 Verify the analyzed repository remains unchanged after analysis, including source files, metadata, caches, temporary files, and subprocess outputs, using the fixtures in `tests/fixtures/`.
