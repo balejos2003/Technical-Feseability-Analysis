@@ -89,3 +89,29 @@ Acceptance thresholds:
 - The defined complete-request fixture meets the 5-minute target in at least 90% of
   repeated runs.
 - History lookup completes within 2 seconds for a seeded set of 10,000 assessments.
+
+## Execution Record
+
+Validated on 2026-09-26 from the repository root with Python 3.11+ and the project
+virtual environment:
+
+- **Scenario 1**: prompts, fixture discovery, and safe provider failure passed. The
+  complete assessment could not run because `OPENAI_API_KEY` was intentionally absent
+  from the validation environment. The application reported the missing provider and
+  did not create an incomplete assessment.
+- **Scenario 2**: the interactive history menu passed list, search, open, return, and
+  unavailable-record behavior. Seeded history tests also confirmed original report
+  retrieval and principal isolation. The empty-history prompt says `No analyses found
+  for this principal.` as expected for a new database.
+- **Scenario 3**: `tests/fixtures/unsupported-repo` with `allowed_extensions=("py",)`
+  discovered `src/parser.py` and reported `README.md` and
+  `vendor/foreign-language.xyz` as `out_of_scope`. A binary NUL-byte case remains
+  covered by the discovery tests because the fixture is kept text-only.
+- **Scenario 4**: discovery and bounded context preparation completed without changing
+  any fixture file; the mixed fixture contained 7 discovered files and a 1,260-character
+  context. The 2-second startup, 5-minute completion, and 10,000-record lookup targets
+  were not benchmarked in this run and remain open for T040.
+
+The quickstart examples use `tests/fixtures/mixed-repo` and
+`tests/fixtures/unsupported-repo` in this repository. A real AI-backed run additionally
+requires `OPENAI_API_KEY` and may set `OPENAI_MODEL`.
