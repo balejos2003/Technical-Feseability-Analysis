@@ -115,6 +115,10 @@ virtual environment:
   and external report saving left the copied fixture tree byte-for-byte and structurally
   unchanged. The SQLite database and Markdown report were created only in the configured
   external application-data directory.
+- **T039 contract verification**: the report included the evidence SHA-256 hash and the
+  original Markdown was reopened unchanged. List, search, and show returned no records
+  for another principal or an unknown identifier. A second write using an existing
+  assessment ID was rejected, preserving the completed snapshot.
 
 The quickstart examples use `tests/fixtures/mixed-repo` and
 `tests/fixtures/unsupported-repo` in this repository. A real AI-backed run additionally

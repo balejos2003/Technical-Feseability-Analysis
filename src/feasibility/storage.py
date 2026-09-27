@@ -146,6 +146,15 @@ def _dump_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+def _reject_existing_assessment(conn: sqlite3.Connection, assessment_id: str) -> None:
+    existing = conn.execute(
+        "SELECT status FROM assessment WHERE assessment_id = ?",
+        (assessment_id,),
+    ).fetchone()
+    if existing is not None:
+        raise ValueError(f"Assessment snapshots are immutable: {assessment_id}")
+
+
 def save_request_record(request: AnalysisRequest, *, database_path: str | Path | None = None) -> str:
     """Persist one request as an immutable record for later historical lookup."""
 
@@ -187,6 +196,7 @@ def save_assessment_record(assessment: FeasibilityAssessment, *, database_path: 
     path = ensure_database(database_path or application_paths().database_path)
     initialize_schema(path)
     with sqlite3.connect(path) as conn:
+        _reject_existing_assessment(conn, assessment.assessment_id)
         conn.execute(
             """
             INSERT INTO assessment (
@@ -330,6 +340,7 @@ def save_analysis_record(
     path = ensure_database(database_path or application_paths().database_path)
     initialize_schema(path)
     with sqlite3.connect(path) as conn:
+        _reject_existing_assessment(conn, assessment.assessment_id)
         conn.execute(
             """
             INSERT INTO request (
