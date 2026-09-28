@@ -163,6 +163,44 @@ def _evidence_items_from_payload(
     return evidence_items, evidence_index
 
 
+def _namespace_assessment_records(
+    assessment_id: str,
+    findings: list[Finding],
+    evidence_items: list[EvidenceItem],
+) -> tuple[list[Finding], list[EvidenceItem]]:
+    """Give persisted child records identifiers unique to their assessment."""
+
+    evidence_ids = {
+        item.evidence_id: f"{assessment_id}:{item.evidence_id}" for item in evidence_items
+    }
+    namespaced_evidence = [
+        EvidenceItem(
+            evidence_id=evidence_ids[item.evidence_id],
+            kind=item.kind,
+            description=item.description,
+            path=item.path,
+            start_line=item.start_line,
+            end_line=item.end_line,
+            excerpt=item.excerpt,
+            file_hash=item.file_hash,
+        )
+        for item in evidence_items
+    ]
+    namespaced_findings = [
+        Finding(
+            finding_id=f"{assessment_id}:{finding.finding_id}",
+            category=finding.category,
+            statement=finding.statement,
+            basis=finding.basis,
+            uncertainty=finding.uncertainty,
+            severity=finding.severity,
+            evidence_ids=[evidence_ids[evidence_id] for evidence_id in finding.evidence_ids],
+        )
+        for finding in findings
+    ]
+    return namespaced_findings, namespaced_evidence
+
+
 def run_analysis_workflow(
     request_input: Mapping[str, str | bool],
     *,
@@ -209,18 +247,24 @@ def run_analysis_workflow(
         )
         normalized = normalize_analysis_response(raw_response, source_context=source_context)
 
+    assessment_id = request_id or str(uuid4())
     evidence_items, _ = _evidence_items_from_payload(raw_response, source_context=source_context)
+    namespaced_findings, namespaced_evidence = _namespace_assessment_records(
+        assessment_id,
+        normalized.findings,
+        evidence_items,
+    )
     assessment = FeasibilityAssessment(
-        assessment_id=request_id or str(uuid4()),
+        assessment_id=assessment_id,
         request_id=context.request.request_id,
         principal_id=context.request.principal_id,
         conclusion=normalized.conclusion,
         evaluated_scope=[item.relative_path for item in context.discovery.files],
-        findings=list(normalized.findings),
+        findings=namespaced_findings,
         limitations=list(normalized.limits),
         report_markdown="placeholder",
         analyzer_version="technical-feasibility-analysis/0.1.0",
-        evidence_items=evidence_items,
+        evidence_items=namespaced_evidence,
         assumptions=list(normalized.assumptions),
         estimates=[dict(estimate) for estimate in normalized.estimates],
         suggestions=list(normalized.suggestions),

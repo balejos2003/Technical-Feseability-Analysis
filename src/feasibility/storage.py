@@ -171,12 +171,6 @@ def save_request_record(request: AnalysisRequest, *, database_path: str | Path |
                 scope_rules,
                 created_at
             ) VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(request_id) DO UPDATE SET
-                principal_id = excluded.principal_id,
-                codebase_root = excluded.codebase_root,
-                change_description = excluded.change_description,
-                scope_rules = excluded.scope_rules,
-                created_at = excluded.created_at
             """,
             (
                 request.request_id,
@@ -212,17 +206,6 @@ def save_assessment_record(assessment: FeasibilityAssessment, *, database_path: 
                 created_at,
                 status
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(assessment_id) DO UPDATE SET
-                request_id = excluded.request_id,
-                principal_id = excluded.principal_id,
-                conclusion = excluded.conclusion,
-                evaluated_scope = excluded.evaluated_scope,
-                findings = excluded.findings,
-                limitations = excluded.limitations,
-                report_markdown = excluded.report_markdown,
-                analyzer_version = excluded.analyzer_version,
-                created_at = excluded.created_at,
-                status = excluded.status
             """,
             (
                 assessment.assessment_id,
@@ -264,15 +247,6 @@ def save_assessment_record(assessment: FeasibilityAssessment, *, database_path: 
                     file_hash,
                     description
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(evidence_id) DO UPDATE SET
-                    assessment_id = excluded.assessment_id,
-                    kind = excluded.kind,
-                    path = excluded.path,
-                    start_line = excluded.start_line,
-                    end_line = excluded.end_line,
-                    excerpt = excluded.excerpt,
-                    file_hash = excluded.file_hash,
-                    description = excluded.description
                 """,
                 (
                     evidence.evidence_id,
@@ -299,13 +273,6 @@ def save_assessment_record(assessment: FeasibilityAssessment, *, database_path: 
                     basis,
                     uncertainty
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(finding_id) DO UPDATE SET
-                    assessment_id = excluded.assessment_id,
-                    category = excluded.category,
-                    severity = excluded.severity,
-                    statement = excluded.statement,
-                    basis = excluded.basis,
-                    uncertainty = excluded.uncertainty
                 """,
                 (
                     finding.finding_id,
@@ -351,12 +318,6 @@ def save_analysis_record(
                 scope_rules,
                 created_at
             ) VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(request_id) DO UPDATE SET
-                principal_id = excluded.principal_id,
-                codebase_root = excluded.codebase_root,
-                change_description = excluded.change_description,
-                scope_rules = excluded.scope_rules,
-                created_at = excluded.created_at
             """,
             (
                 request.request_id,
@@ -382,17 +343,6 @@ def save_analysis_record(
                 created_at,
                 status
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(assessment_id) DO UPDATE SET
-                request_id = excluded.request_id,
-                principal_id = excluded.principal_id,
-                conclusion = excluded.conclusion,
-                evaluated_scope = excluded.evaluated_scope,
-                findings = excluded.findings,
-                limitations = excluded.limitations,
-                report_markdown = excluded.report_markdown,
-                analyzer_version = excluded.analyzer_version,
-                created_at = excluded.created_at,
-                status = excluded.status
             """,
             (
                 assessment.assessment_id,
@@ -434,15 +384,6 @@ def save_analysis_record(
                     file_hash,
                     description
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(evidence_id) DO UPDATE SET
-                    assessment_id = excluded.assessment_id,
-                    kind = excluded.kind,
-                    path = excluded.path,
-                    start_line = excluded.start_line,
-                    end_line = excluded.end_line,
-                    excerpt = excluded.excerpt,
-                    file_hash = excluded.file_hash,
-                    description = excluded.description
                 """,
                 (
                     evidence.evidence_id,
@@ -469,13 +410,6 @@ def save_analysis_record(
                     basis,
                     uncertainty
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(finding_id) DO UPDATE SET
-                    assessment_id = excluded.assessment_id,
-                    category = excluded.category,
-                    severity = excluded.severity,
-                    statement = excluded.statement,
-                    basis = excluded.basis,
-                    uncertainty = excluded.uncertainty
                 """,
                 (
                     finding.finding_id,

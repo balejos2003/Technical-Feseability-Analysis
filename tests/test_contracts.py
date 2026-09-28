@@ -1,4 +1,5 @@
 import hashlib
+import sqlite3
 
 import pytest
 
@@ -83,5 +84,21 @@ def test_completed_assessment_snapshot_cannot_be_overwritten(tmp_path):
         save_analysis_record(replacement_request, replacement, database_path=db_path)
 
     detail = get_history_detail("assessment-immutable", "alice", database_path=db_path)
+    assert detail is not None
+    assert detail.markdown_report == "original report"
+
+
+def test_child_snapshot_records_cannot_be_reassigned_between_assessments(tmp_path):
+    db_path = tmp_path / "history.sqlite3"
+    request, assessment = _assessment("assessment-original", "alice", "original report")
+    save_analysis_record(request, assessment, database_path=db_path)
+
+    replacement_request, replacement = _assessment("assessment-other", "alice", "other report")
+    object.__setattr__(replacement, "evidence_items", assessment.evidence_items)
+    object.__setattr__(replacement, "findings", assessment.findings)
+    with pytest.raises(sqlite3.IntegrityError):
+        save_analysis_record(replacement_request, replacement, database_path=db_path)
+
+    detail = get_history_detail("assessment-original", "alice", database_path=db_path)
     assert detail is not None
     assert detail.markdown_report == "original report"
