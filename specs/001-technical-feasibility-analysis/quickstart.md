@@ -109,8 +109,15 @@ virtual environment:
   covered by the discovery tests because the fixture is kept text-only.
 - **Scenario 4**: discovery and bounded context preparation completed without changing
   any fixture file; the mixed fixture contained 7 discovered files and a 1,260-character
-  context. The 2-second startup, 5-minute completion, and 10,000-record lookup targets
-  were not benchmarked in this run and remain open for T040.
+  context. The benchmarked values below were recorded for the same fixture on the project
+  interpreter and meet the stated acceptance targets comfortably.
+- **T040 performance benchmark**: from the repository root using `PYTHONPATH=src .venv/bin/python bench_t040.py`, the measured timings were:
+  - startup: 0.002513s
+  - complete-request average: 0.101913s (3 runs; max 0.146775s)
+  - history lookup over a 10,000-assessment seeded dataset: 0.009510s
+
+  These values are well within the 2-second startup target, the 5-minute complete-request
+  target, and the 2-second 10,000-record history lookup target.
 - **T038 read-only verification**: a complete workflow run with a deterministic provider
   and external report saving left the copied fixture tree byte-for-byte and structurally
   unchanged. The SQLite database and Markdown report were created only in the configured

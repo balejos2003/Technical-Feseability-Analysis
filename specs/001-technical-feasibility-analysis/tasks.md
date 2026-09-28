@@ -124,7 +124,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T037 Run the scenarios in `specs/001-technical-feasibility-analysis/quickstart.md` against the implemented script and record any contract deviations in `specs/001-technical-feasibility-analysis/quickstart.md`.
 - [X] T038 Verify the analyzed repository remains unchanged after analysis, including source files, metadata, caches, temporary files, and subprocess outputs, using the fixtures in `tests/fixtures/`.
 - [X] T039 Verify report traceability and historical isolation using `specs/001-technical-feasibility-analysis/contracts/report.md` and `specs/001-technical-feasibility-analysis/contracts/storage.md`, including evidence hashes, principal filtering, immutable snapshots, and no-match behavior.
-- [ ] T040 Measure the small-fixture startup target, complete-request five-minute target, and 10,000-record history lookup target, documenting results in `specs/001-technical-feasibility-analysis/quickstart.md`.
+- [x] T040 Measure the small-fixture startup target, complete-request five-minute target, and 10,000-record history lookup target, documenting results in `specs/001-technical-feasibility-analysis/quickstart.md`.
 - [ ] T041 Review `src/feasibility/` for dead code, duplicated prompt logic, provider-specific leakage, and undocumented assumptions before implementation handoff.
 
 ---
