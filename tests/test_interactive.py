@@ -487,6 +487,78 @@ def test_run_analysis_workflow_retries_uncited_provider_response(tmp_path):
     assert "CORRECTION REQUIRED" in prompts[1]
 
 
+def test_run_analysis_workflow_retries_evidence_outside_context(tmp_path):
+    source_text = "def calculate():\n    return 1\n"
+    (tmp_path / "module.py").write_text(source_text, encoding="utf-8")
+    file_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+    responses = iter(
+        [
+            {
+                "conclusion": "feasible",
+                "findings": [{
+                    "id": "f-1",
+                    "category": "fact",
+                    "statement": "The task file controls the behavior.",
+                    "basis": "The provider cited a file outside the supplied context.",
+                    "evidence": [{
+                        "id": "ev-1",
+                        "kind": "code",
+                        "path": "tasks.md",
+                        "start_line": 1,
+                        "end_line": 1,
+                        "excerpt": "not supplied",
+                        "hash": "invalid",
+                    }],
+                }],
+                "limitations": [],
+            },
+            {
+                "conclusion": "feasible",
+                "findings": [{
+                    "id": "f-1",
+                    "category": "fact",
+                    "statement": "The calculator entry point exists.",
+                    "basis": "The supplied module contains the function.",
+                    "evidence": [{
+                        "id": "ev-1",
+                        "kind": "code",
+                        "path": "module.py",
+                        "start_line": 1,
+                        "end_line": 2,
+                        "excerpt": source_text.rstrip("\n"),
+                        "hash": file_hash,
+                    }],
+                }],
+                "limitations": ["Runtime behavior was not tested."],
+                "assumptions": [],
+                "estimates": [],
+                "suggestions": [],
+                "unresolved_questions": [],
+            },
+        ]
+    )
+    prompts = []
+
+    def provider(prompt):
+        prompts.append(prompt)
+        return next(responses)
+
+    assessment = run_analysis_workflow(
+        {
+            "codebase_path": str(tmp_path),
+            "requested_change": "Add parentheses",
+            "additional_context": "",
+            "save_report": False,
+        },
+        principal_id="alice",
+        provider=provider,
+    )
+
+    assert assessment.conclusion.value == "feasible"
+    assert len(prompts) == 2
+    assert "Do not cite excluded, truncated, undiscovered, or implied files" in prompts[1]
+
+
 def test_display_report_outputs_complete_markdown_report():
     assessment = FeasibilityAssessment(
         assessment_id="assess-display",

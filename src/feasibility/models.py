@@ -66,6 +66,7 @@ class ScopeRules:
 
     excluded_dirs: tuple[str, ...] = (
         ".git",
+        ".github",
         ".hg",
         ".svn",
         "node_modules",

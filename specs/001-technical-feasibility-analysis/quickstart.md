@@ -111,10 +111,11 @@ virtual environment:
   any fixture file; the mixed fixture contained 7 discovered files and a 1,260-character
   context. The benchmarked values below were recorded for the same fixture on the project
   interpreter and meet the stated acceptance targets comfortably.
-- **T040 performance benchmark**: from the repository root using `PYTHONPATH=src .venv/bin/python bench_t040.py`, the measured timings were:
-  - startup: 0.002513s
-  - complete-request average: 0.101913s (3 runs; max 0.146775s)
-  - history lookup over a 10,000-assessment seeded dataset: 0.009510s
+- **T040 performance benchmark**: from the repository root using
+  `PYTHONPATH=src .venv/bin/python /tmp/bench_t040_clean.py`, the measured timings were:
+  - startup: 0.005515s
+  - complete-request average: 0.124907s (3 runs; max 0.140578s)
+  - history lookup over a 10,000-assessment seeded dataset: 0.010161s
 
   These values are well within the 2-second startup target, the 5-minute complete-request
   target, and the 2-second 10,000-record history lookup target.

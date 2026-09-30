@@ -230,15 +230,27 @@ def run_analysis_workflow(
     try:
         normalized = normalize_analysis_response(raw_response, source_context=source_context)
     except ValueError as exc:
-        if "requires at least one evidence item" not in str(exc):
+        error_message = str(exc)
+        recoverable_evidence_error = any(
+            marker in error_message
+            for marker in (
+                "requires at least one evidence item",
+                "outside the supplied context",
+                "range is missing from the supplied context",
+                "range is outside the supplied context",
+                "hash does not match the supplied context",
+            )
+        )
+        if not recoverable_evidence_error:
             raise
 
         correction = (
-            "\n\nCORRECTION REQUIRED: Your previous response contained a finding without evidence. "
-            "Return the complete JSON response again. Every finding must include at least one "
-            "evidence object citing an exact file path, inclusive line range, excerpt, and hash "
-            "from the supplied context. If evidence is unavailable, omit that finding and put "
-            "the issue in limitations or unresolved_questions.\n"
+            "\n\nCORRECTION REQUIRED: Your previous response cited evidence that was missing, "
+            "outside, truncated, or inconsistent with the supplied context. Return the complete "
+            "JSON response again. Every finding must include evidence from an exact File entry "
+            "in the supplied context, with an inclusive line range, excerpt, and matching hash. "
+            "If evidence is unavailable, omit that finding and put the issue in limitations or "
+            "unresolved_questions. Do not cite excluded, truncated, undiscovered, or implied files.\n"
         )
         raw_response = invoke_analysis_provider(
             prompt_request,

@@ -73,3 +73,15 @@ def test_context_includes_constitution_without_special_priority(tmp_path):
         "source.py",
     ]
     assert "Constitution" in context.items[0].excerpt
+
+
+def test_discovery_excludes_github_by_default(tmp_path):
+    github_file = tmp_path / ".github" / "workflows" / "ci.yml"
+    github_file.parent.mkdir(parents=True)
+    github_file.write_text("name: CI\n", encoding="utf-8")
+    source_file = tmp_path / "source.py"
+    source_file.write_text("value = 1\n", encoding="utf-8")
+
+    discovery = discover_repository(tmp_path)
+
+    assert [item.relative_path for item in discovery.files] == ["source.py"]
