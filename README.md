@@ -74,7 +74,7 @@ do repositório avaliado.
   são registrados como problemas de descoberta.
 - Links simbólicos são ignorados por padrão.
 - Arquivos acima de 1 MB são excluídos por padrão.
-- `.git`, `.hg`, `.svn`, `node_modules`, `__pycache__`, `.venv`, `venv`, `dist` e `build`
+- `.git`, ` .github` , `.hg`, `.svn`, `node_modules`, `__pycache__`, `.venv`, `venv`, `dist` e `build`
   são excluídos por padrão. O diretório `.specify` não é excluído e pode fazer parte do
   contexto analisado.
 - O contexto enviado à IA é limitado a 100.000 caracteres por análise. Arquivos que não
