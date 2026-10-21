@@ -26,8 +26,10 @@ remains simple to operate and maintain.
 
 **Language/Version**: Python 3.11+
 
-**Primary Dependencies**: Configured AI analysis provider; Python standard library
-`input()`, `sqlite3`, `pathlib`, `dataclasses`, `hashlib`, and `json`
+**Primary Dependencies**: Configured AI analysis provider (OpenAI-compatible, Anthropic,
+or Gemini); Python
+standard library `input()`, `sqlite3`, `pathlib`, `dataclasses`, `hashlib`, `json`, and
+`urllib`
 
 **Storage**: SQLite database for completed analysis history; codebase remains read-only
 

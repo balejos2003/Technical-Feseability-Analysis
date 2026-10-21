@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from collections.abc import Callable, Mapping
 import json
 import os
+import ssl
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 from typing import Any
 
 from .context import SourceContext
@@ -23,6 +27,19 @@ from .models import (
 
 
 Provider = Callable[[str], Mapping[str, Any]]
+
+
+def _tls_context() -> ssl.SSLContext:
+    """Build a verified TLS context using an explicit or certifi CA bundle."""
+
+    ca_bundle = os.environ.get("AI_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if ca_bundle:
+        return ssl.create_default_context(cafile=ca_bundle)
+    try:
+        import certifi
+    except ImportError:  # pragma: no cover - dependency is declared in pyproject.toml
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def _normalize_enum_value(value: Any) -> Any:
@@ -62,65 +79,159 @@ def _normalize_estimates(value: Any) -> tuple[list[dict[str, str]], list[str]]:
     return estimates, limitations
 
 
-def build_openai_provider(
+def _request_json(request: Request) -> Mapping[str, Any]:
+    try:
+        with urlopen(request, timeout=120, context=_tls_context()) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        status_code = getattr(exc, "code", None)
+        suffix = f" (HTTP {status_code})" if status_code else ""
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:300]
+        except OSError:
+            detail = ""
+        detail_text = f" Details: {detail}" if detail else ""
+        raise AIServiceUnavailableError(
+            f"The configured AI analysis provider rejected the request{suffix}.{detail_text}"
+        ) from exc
+    except (URLError, ConnectionError, OSError, TimeoutError) as exc:
+        reason = getattr(exc, "reason", None) or str(exc)
+        raise AIServiceUnavailableError(
+            f"The configured AI analysis provider could not be reached: {reason}."
+        ) from exc
+
+    if not isinstance(payload, Mapping):
+        raise TypeError("The configured AI provider must return a JSON object.")
+    return payload
+
+
+def _parse_json_content(content: str) -> Mapping[str, Any]:
+    if not content:
+        raise ValueError("The AI provider returned an empty response.")
+    payload = json.loads(content)
+    if not isinstance(payload, Mapping):
+        raise TypeError("The configured AI provider must return a JSON object.")
+    return payload
+
+
+def build_api_provider(
     *,
     api_key: str | None = None,
     model: str | None = None,
+    base_url: str | None = None,
+    provider_name: str | None = None,
 ) -> Provider:
-    """Build the configured OpenAI provider without exposing credentials to prompts."""
+    """Build an OpenAI-compatible, Anthropic, or Gemini API provider."""
 
-    resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY")
+    resolved_api_key = api_key or os.environ.get("AI_API_KEY")
     if not resolved_api_key:
         raise AIServiceUnavailableError(
-            "No OpenAI API key is configured. Set OPENAI_API_KEY before starting an analysis."
+            "No AI API key is configured. Set AI_API_KEY before starting an analysis."
         )
 
-    resolved_model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    try:
-        from openai import OpenAI
-    except ImportError as exc:  # pragma: no cover - depends on environment packaging
+    resolved_provider = (provider_name or os.environ.get("AI_PROVIDER") or "").lower()
+    if not resolved_provider:
         raise AIServiceUnavailableError(
-            "The OpenAI dependency is not installed.",
-        ) from exc
+            "No AI provider is configured. Set AI_PROVIDER before starting an analysis."
+        )
 
-    client = OpenAI(api_key=resolved_api_key)
+    resolved_model = model or os.environ.get("AI_MODEL") or ""
+    if not resolved_model:
+        raise AIServiceUnavailableError(
+            "No AI model is configured. Set AI_MODEL before starting an analysis."
+        )
+    resolved_base_url = (
+        base_url
+        or os.environ.get("AI_BASE_URL")
+        or {
+            "anthropic": "https://api.anthropic.com/v1",
+            "gemini": "https://generativelanguage.googleapis.com/v1beta",
+            "openai-compatible": "https://api.openai.com/v1",
+        }.get(resolved_provider, "")
+    ).rstrip("/")
+    if resolved_provider not in {"openai-compatible", "anthropic", "gemini"}:
+        raise ValueError("AI_PROVIDER must be openai-compatible, anthropic, or gemini")
 
     def provider(prompt: str) -> Mapping[str, Any]:
         try:
-            response = client.chat.completions.create(
-                model=resolved_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Return only a valid JSON object matching the requested analysis contract.",
+            if resolved_provider == "anthropic":
+                endpoint = f"{resolved_base_url}/messages"
+                request = Request(
+                    endpoint,
+                    data=json.dumps({
+                        "model": resolved_model,
+                        "max_tokens": 8192,
+                        "system": "Return only a valid JSON object matching the requested analysis contract.",
+                        "messages": [{"role": "user", "content": prompt}],
+                    }).encode("utf-8"),
+                    headers={
+                        "x-api-key": resolved_api_key,
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json",
                     },
-                    {"role": "user", "content": prompt},
-                ],
-                response_format={"type": "json_object"},
-            )
-            content = response.choices[0].message.content
-            if not content:
-                raise ValueError("The AI provider returned an empty response.")
-            payload = json.loads(content)
-        except (ConnectionError, OSError, TimeoutError) as exc:
-            raise AIServiceUnavailableError("The OpenAI analysis provider is unavailable.") from exc
+                    method="POST",
+                )
+                response_payload = _request_json(request)
+                content = response_payload["content"][0]["text"]
+            elif resolved_provider == "gemini":
+                endpoint = f"{resolved_base_url}/models/{quote(resolved_model, safe='')}:generateContent?key={quote(resolved_api_key, safe='')}"
+                request = Request(
+                    endpoint,
+                    data=json.dumps({
+                        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                        "systemInstruction": {"parts": [{"text": "Return only a valid JSON object matching the requested analysis contract."}]},
+                        "generationConfig": {"responseMimeType": "application/json"},
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                response_payload = _request_json(request)
+                content = response_payload["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                endpoint = resolved_base_url if resolved_base_url.endswith("/chat/completions") else f"{resolved_base_url}/chat/completions"
+                request = Request(
+                    endpoint,
+                    data=json.dumps({
+                        "model": resolved_model,
+                        "messages": [
+                            {"role": "system", "content": "Return only a valid JSON object matching the requested analysis contract."},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "response_format": {"type": "json_object"},
+                    }).encode("utf-8"),
+                    headers={"Authorization": f"Bearer {resolved_api_key}", "Content-Type": "application/json"},
+                    method="POST",
+                )
+                response_payload = _request_json(request)
+                content = response_payload["choices"][0]["message"]["content"]
+            payload = _parse_json_content(content)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
-            raise ValueError("The OpenAI provider returned invalid JSON.") from exc
+            raise ValueError("The configured AI provider returned invalid JSON.") from exc
+        except AIServiceUnavailableError:
+            raise
         except Exception as exc:  # pragma: no cover - provider SDK-specific failures
             error_type = type(exc).__name__
             status_code = getattr(exc, "status_code", None)
             status_text = f" (HTTP {status_code})" if status_code else ""
             raise AIServiceUnavailableError(
-                "The OpenAI analysis provider failed "
+                "The configured AI analysis provider failed "
                 f"with {error_type}{status_text}: {exc}. "
-                "Check the API key, project billing/credits, model access, and network connection."
+                "Check the API key, endpoint, model access, and network connection."
             ) from exc
 
-        if not isinstance(payload, Mapping):
-            raise TypeError("The OpenAI provider must return a JSON object.")
         return dict(payload)
 
     return provider
+
+
+def build_openai_provider(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+) -> Provider:
+    """Backward-compatible alias for the generic API provider."""
+
+    return build_api_provider(api_key=api_key, model=model)
 
 
 @dataclass(frozen=True)
@@ -371,6 +482,7 @@ __all__ = [
     "AnalysisEvidenceRef",
     "AnalysisResponse",
     "build_analysis_prompt",
+    "build_api_provider",
     "build_openai_provider",
     "invoke_analysis_provider",
     "normalize_analysis_response",

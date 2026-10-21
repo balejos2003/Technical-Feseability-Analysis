@@ -358,7 +358,7 @@ def test_menu_option_one_runs_provider_and_displays_completed_report(tmp_path):
 def test_openai_provider_requires_api_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
-    with pytest.raises(AIServiceUnavailableError, match="OPENAI_API_KEY"):
+    with pytest.raises(AIServiceUnavailableError, match="AI_API_KEY"):
         build_openai_provider()
 
 

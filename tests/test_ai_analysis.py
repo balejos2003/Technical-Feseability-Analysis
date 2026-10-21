@@ -1,3 +1,8 @@
+import json
+
+import pytest
+
+from feasibility import ai_analysis
 from feasibility.ai_analysis import (
     AnalysisResponse,
     build_analysis_prompt,
@@ -8,6 +13,103 @@ from feasibility.context import prepare_source_context
 from feasibility.discovery import discover_repository
 from feasibility.models import AnalysisRequest
 from feasibility.models import EvidenceKind, FeasibilityConclusion, FindingCategory
+
+
+def test_build_api_provider_uses_generic_key_endpoint_and_model(monkeypatch):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": '{"ok": true}'}}]}).encode()
+
+    def fake_urlopen(request, timeout, context):
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.headers)
+        captured["body"] = json.loads(request.data)
+        captured["timeout"] = timeout
+        captured["context"] = context
+        return Response()
+
+    monkeypatch.setattr(ai_analysis, "urlopen", fake_urlopen)
+    provider = ai_analysis.build_api_provider(
+        provider_name="openai-compatible",
+        api_key="provider-key",
+        base_url="https://provider.example/v1",
+        model="provider-model",
+    )
+
+    assert provider("Analyze this") == {"ok": True}
+    assert captured["url"] == "https://provider.example/v1/chat/completions"
+    assert captured["headers"]["Authorization"] == "Bearer provider-key"
+    assert captured["body"]["model"] == "provider-model"
+    assert captured["timeout"] == 120
+    assert captured["context"].verify_mode.name == "CERT_REQUIRED"
+
+
+def test_build_api_provider_requires_explicit_provider_and_model(monkeypatch):
+    monkeypatch.delenv("AI_PROVIDER", raising=False)
+    monkeypatch.delenv("AI_MODEL", raising=False)
+    monkeypatch.setenv("AI_API_KEY", "test-key")
+
+    with pytest.raises(Exception, match="AI_PROVIDER"):
+        ai_analysis.build_api_provider()
+
+    monkeypatch.setenv("AI_PROVIDER", "openai-compatible")
+    with pytest.raises(Exception, match="AI_MODEL"):
+        ai_analysis.build_api_provider()
+
+
+def test_build_api_provider_supports_anthropic_and_gemini_response_shapes(monkeypatch):
+    requests = []
+
+    class Response:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode()
+
+    responses = iter([
+        {"content": [{"text": '{"provider": "anthropic"}'}]},
+        {"candidates": [{"content": {"parts": [{"text": '{"provider": "gemini"}'}]}}]},
+    ])
+
+    def fake_urlopen(request, timeout, context):
+        requests.append(request)
+        return Response(next(responses))
+
+    monkeypatch.setattr(ai_analysis, "urlopen", fake_urlopen)
+
+    anthropic = ai_analysis.build_api_provider(
+        provider_name="anthropic",
+        api_key="anthropic-key",
+        model="claude-sonnet",
+    )
+    gemini = ai_analysis.build_api_provider(
+        provider_name="gemini",
+        api_key="gemini-key",
+        model="gemini-2.5-pro",
+    )
+
+    assert anthropic("Analyze this") == {"provider": "anthropic"}
+    assert gemini("Analyze this") == {"provider": "gemini"}
+    assert requests[0].full_url == "https://api.anthropic.com/v1/messages"
+    assert requests[0].headers["X-api-key"] == "anthropic-key"
+    assert requests[1].full_url.startswith(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key="
+    )
 
 
 def test_build_analysis_prompt_includes_required_fields():

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .ai_analysis import Provider, build_openai_provider
+from .ai_analysis import Provider, build_api_provider
 from .config import application_paths, ensure_output_outside_repository, resolve_principal_id
 from .errors import FeasibilityError
 from .history import get_history_detail, list_history, search_history
@@ -188,7 +188,7 @@ def run_analysis_interaction(
         completed_assessment = assessment or run_analysis_workflow(
             request_input,
             principal_id=effective_principal,
-            provider=provider or build_openai_provider(),
+            provider=provider or build_api_provider(),
         )
     except FeasibilityError as exc:
         output_fn(f"Analysis failed: {exc.message}")

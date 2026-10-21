@@ -126,6 +126,7 @@ description: "Task list for implementing Technical Feasibility Analysis"
 - [X] T039 Verify report traceability and historical isolation using `specs/001-technical-feasibility-analysis/contracts/report.md` and `specs/001-technical-feasibility-analysis/contracts/storage.md`, including evidence hashes, principal filtering, immutable snapshots, and no-match behavior.
 - [X] T040 Measure the small-fixture startup target, complete-request five-minute target, and 10,000-record history lookup target, documenting results in `specs/001-technical-feasibility-analysis/quickstart.md`.
 - [X] T041 Review `src/feasibility/` for dead code, duplicated prompt logic, provider-specific leakage, and undocumented assumptions before implementation handoff.
+- [X] T043 Support configurable OpenAI-compatible, Anthropic, and Gemini AI providers through generic API key, model, and provider settings.
 
 ---
 

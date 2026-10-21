@@ -127,18 +127,37 @@ também permanecem separados no relatório.
 - Python 3.11 ou superior.
 - Dependências e entry point definidos em [pyproject.toml](pyproject.toml).
 - O diretório de dados pode ser configurado com `FEASIBILITY_DATA_DIR`.
-- A análise real usa `OPENAI_API_KEY`; opcionalmente, `OPENAI_MODEL` define o modelo
-  usado, com `gpt-4o-mini` como padrão.
-
+- A análise suporta os modos `openai-compatible`, `anthropic` e `gemini`. É obrigatório
+  configurar `AI_PROVIDER`, `AI_API_KEY` e `AI_MODEL`; não há provider, chave ou modelo
+  padrão. `AI_BASE_URL` só é necessário para um endpoint compatível diferente.
 Antes de iniciar uma análise, configure a credencial no ambiente:
 
 ```bash
-export OPENAI_API_KEY="sua-chave"
-export OPENAI_MODEL="gpt-4o-mini"
+export AI_API_KEY="sua-chave-openai"
+export AI_PROVIDER="openai-compatible"
+export AI_MODEL="gpt-4o-mini"
 PYTHONPATH=src python -m feasibility
 ```
 
-Sem `OPENAI_API_KEY`, o programa preserva a base analisada e informa que o provider
+Para Anthropic/Claude:
+
+```bash
+export AI_PROVIDER="anthropic"
+export AI_API_KEY="sua-chave-anthropic"
+export AI_MODEL="claude-sonnet-4-5"
+PYTHONPATH=src python -m feasibility
+```
+
+Para Gemini:
+
+```bash
+export AI_PROVIDER="gemini"
+export AI_API_KEY="sua-chave-google"
+export AI_MODEL="gemini-3.5-flash-lite"
+PYTHONPATH=src python -m feasibility
+```
+
+Sem `AI_API_KEY`, o programa preserva a base analisada e informa que o provider
 não está configurado, sem criar um relatório ou registro incompleto.
 
 ## Validação
